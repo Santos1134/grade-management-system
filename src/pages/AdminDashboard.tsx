@@ -36,6 +36,8 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
   const [showPassword, setShowPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ userId: string; userName: string } | null>(null);
+  const [filterGrade, setFilterGrade] = useState<string>('all');
+  const [filterRole, setFilterRole] = useState<string>('all');
 
   // Load users from localStorage
   const loadUsers = () => {
@@ -243,6 +245,22 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
     showNotification(`Password reset successfully for ${userName}!`, 'success');
     loadUsers();
+  };
+
+  const getFilteredUsers = () => {
+    return users.filter(u => {
+      const roleMatch = filterRole === 'all' || u.role === filterRole;
+      const gradeMatch = filterGrade === 'all' || u.grade === filterGrade;
+      return roleMatch && gradeMatch;
+    });
+  };
+
+  const getAvailableGrades = () => {
+    const grades = new Set<string>();
+    users.forEach(u => {
+      if (u.grade) grades.add(u.grade);
+    });
+    return Array.from(grades).sort();
   };
 
   return (
@@ -477,7 +495,58 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
         {/* Users List */}
         <div className="bg-white rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">All Users</h2>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <h2 className="text-xl font-semibold text-gray-900">All Users</h2>
+
+              {/* Filter Controls */}
+              <div className="flex flex-wrap gap-3">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700">Role:</label>
+                  <select
+                    value={filterRole}
+                    onChange={(e) => setFilterRole(e.target.value)}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                  >
+                    <option value="all">All Roles</option>
+                    <option value="student">Students</option>
+                    <option value="sponsor">Sponsors</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-gray-700">Grade:</label>
+                  <select
+                    value={filterGrade}
+                    onChange={(e) => setFilterGrade(e.target.value)}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                  >
+                    <option value="all">All Grades</option>
+                    {getAvailableGrades().map(grade => (
+                      <option key={grade} value={grade}>{grade}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {(filterRole !== 'all' || filterGrade !== 'all') && (
+                  <button
+                    onClick={() => {
+                      setFilterRole('all');
+                      setFilterGrade('all');
+                    }}
+                    className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
+                  >
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Filter Summary */}
+            {(filterRole !== 'all' || filterGrade !== 'all') && (
+              <div className="mt-3 text-sm text-gray-600">
+                Showing <span className="font-semibold text-green-600">{getFilteredUsers().length}</span> of {users.length} users
+              </div>
+            )}
           </div>
 
           <div className="overflow-x-auto">
@@ -492,7 +561,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {users.map((user) => (
+                {getFilteredUsers().map((user) => (
                   <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {user.name}
@@ -526,6 +595,13 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                     </td>
                   </tr>
                 ))}
+                {getFilteredUsers().length === 0 && users.length > 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                      No users match the current filters. Try adjusting your filter criteria.
+                    </td>
+                  </tr>
+                )}
                 {users.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
