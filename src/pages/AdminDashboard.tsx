@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Notification from '../components/Notification';
+import { adminService } from '../services/admin.service';
 
 interface Admin {
   id: string;
@@ -51,11 +52,14 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
   const [showAuditTrail, setShowAuditTrail] = useState(false);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
-  // Load users from localStorage
-  const loadUsers = () => {
-    const storedUsers = localStorage.getItem('users');
-    if (storedUsers) {
-      setUsers(JSON.parse(storedUsers));
+  // Load users from Supabase
+  const loadUsers = async () => {
+    try {
+      const data = await adminService.getAllUsers();
+      setUsers(data || []);
+    } catch (error) {
+      console.error('Error loading users:', error);
+      showNotification('Failed to load users', 'error');
     }
   };
 
@@ -89,28 +93,16 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     return { valid: true, message: '' };
   };
 
-  const generateStudentId = () => {
-    const storedUsers = localStorage.getItem('users');
-    const users = storedUsers ? JSON.parse(storedUsers) : [];
-    const students = users.filter((u: any) => u.role === 'student');
-
-    // Find the highest student ID number
-    let maxId = 0;
-    students.forEach((student: any) => {
-      if (student.studentId) {
-        const numPart = parseInt(student.studentId.replace('STU', ''));
-        if (!isNaN(numPart) && numPart > maxId) {
-          maxId = numPart;
-        }
-      }
-    });
-
-    // Generate next ID
-    const nextId = maxId + 1;
-    return `STU${nextId.toString().padStart(4, '0')}`;
+  const generateStudentId = async () => {
+    try {
+      return await adminService.generateStudentId();
+    } catch (error) {
+      console.error('Error generating student ID:', error);
+      return 'STU0001';
+    }
   };
 
-  const handleCreateUser = (e: React.FormEvent) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validate password
@@ -122,120 +114,65 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     }
     setPasswordError('');
 
-    const storedUsers = localStorage.getItem('users');
-    const users = storedUsers ? JSON.parse(storedUsers) : [];
+    try {
+      // Auto-generate email
+      const autoEmail = generateEmail(formData.name);
 
-    // Auto-generate email
-    const autoEmail = generateEmail(formData.name);
+      // Auto-generate student ID for students
+      const studentId = userType === 'student' ? await generateStudentId() : undefined;
 
-    // Check if email already exists
-    if (users.find((u: any) => u.email === autoEmail)) {
-      showNotification('Email already exists!', 'error');
-      return;
-    }
-
-    // Check for duplicate sponsor assignment
-    if (userType === 'sponsor') {
-      const existingSponsor = users.find((u: any) =>
-        u.role === 'sponsor' &&
-        u.grade === formData.grade &&
-        u.section === (formData.section || undefined)
-      );
-      if (existingSponsor) {
-        const gradeLabel = formData.section
-          ? `${formData.grade} Section ${formData.section}`
-          : formData.grade;
-        showNotification(`A sponsor is already assigned to ${gradeLabel}: ${existingSponsor.name}`, 'error');
-        return;
-      }
-    }
-
-    // Auto-generate student ID for students
-    const studentId = userType === 'student' ? generateStudentId() : undefined;
-
-    const newUser = {
-      id: Date.now().toString(),
-      email: autoEmail,
-      password: formData.password,
-      name: formData.name,
-      role: userType,
-      ...(userType === 'student' ? {
+      // Create user in Supabase
+      await adminService.createUser({
+        email: autoEmail,
+        password: formData.password,
+        name: formData.name,
+        role: userType!,
         studentId: studentId,
         grade: formData.grade,
         section: formData.section || undefined,
-      } : {
-        grade: formData.grade,
-        section: formData.section || undefined,
-      }),
-    };
+      });
 
-    users.push(newUser);
-    localStorage.setItem('users', JSON.stringify(users));
+      showNotification(
+        `${userType === 'student' ? 'Student' : 'Sponsor'} account created successfully! Email: ${autoEmail}`,
+        'success'
+      );
 
-    // Log the change
-    const changeLog = JSON.parse(localStorage.getItem('changeLog') || '[]');
-    changeLog.push({
-      timestamp: new Date().toISOString(),
-      user: user.name,
-      userId: user.id,
-      action: 'CREATE_USER',
-      details: {
-        newUserId: newUser.id,
-        newUserName: newUser.name,
-        newUserRole: newUser.role,
-        newUserEmail: newUser.email,
-      },
-    });
-    localStorage.setItem('changeLog', JSON.stringify(changeLog));
+      // Reset form
+      setFormData({
+        password: '',
+        name: '',
+        role: 'student',
+        studentId: '',
+        grade: '',
+        section: '',
+      });
+      setUserType(null);
+      setShowCreateUser(false);
 
-    showNotification(
-      `${userType === 'student' ? 'Student' : 'Sponsor'} account created successfully! Email: ${autoEmail}`,
-      'success'
-    );
-
-    // Reset form
-    setFormData({
-      password: '',
-      name: '',
-      role: 'student',
-      studentId: '',
-      grade: '',
-      section: '',
-    });
-    setUserType(null);
-    setShowCreateUser(false);
-    loadUsers();
+      // Reload users
+      await loadUsers();
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      showNotification(error.message || 'Failed to create user', 'error');
+    }
   };
 
   const handleDeleteUser = (userId: string, userName: string) => {
     setDeleteConfirm({ userId, userName });
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteConfirm) return;
 
-    const storedUsers = localStorage.getItem('users');
-    const users = storedUsers ? JSON.parse(storedUsers) : [];
-    const filteredUsers = users.filter((u: any) => u.id !== deleteConfirm.userId);
-    localStorage.setItem('users', JSON.stringify(filteredUsers));
-
-    // Log the change
-    const changeLog = JSON.parse(localStorage.getItem('changeLog') || '[]');
-    changeLog.push({
-      timestamp: new Date().toISOString(),
-      user: user.name,
-      userId: user.id,
-      action: 'DELETE_USER',
-      details: {
-        deletedUserId: deleteConfirm.userId,
-        deletedUserName: deleteConfirm.userName,
-      },
-    });
-    localStorage.setItem('changeLog', JSON.stringify(changeLog));
-
-    showNotification('User deleted successfully!', 'success');
-    setDeleteConfirm(null);
-    loadUsers();
+    try {
+      await adminService.deleteUser(deleteConfirm.userId);
+      showNotification('User deleted successfully!', 'success');
+      setDeleteConfirm(null);
+      await loadUsers();
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      showNotification(error.message || 'Failed to delete user', 'error');
+    }
   };
 
   const handleResetPassword = (userId: string, userName: string) => {

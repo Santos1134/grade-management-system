@@ -21,7 +21,11 @@
       "Bash(start http://localhost:5173/)",
       "Bash(npx tsc:*)",
       "Bash(awk:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(explorer c:Userssumomgrade-management-frontendsupabase)",
+      "Bash(curl:*)",
+      "Bash(timeout /t 5)",
+      "Bash(start http://localhost:5174/)"
     ],
     "deny": [],
     "ask": []

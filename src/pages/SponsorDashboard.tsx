@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import Notification from '../components/Notification';
+import { userService } from '../services/user.service';
+import { gradeService } from '../services/grade.service';
 
 interface User {
   id: string;
@@ -147,29 +149,53 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
     setNotification({ message, type });
   };
 
-  const loadStudents = () => {
-    const storedUsers = localStorage.getItem('users');
-    let gradeStudents: any[] = [];
-
-    if (storedUsers) {
-      const allUsers = JSON.parse(storedUsers);
-      gradeStudents = allUsers.filter(
-        (u: any) =>
-          u.role === 'student' &&
-          u.grade === user.grade &&
-          // Match section if sponsor has a section (for 7th and 8th grade)
-          (!user.section || u.section === user.section)
-      );
+  const loadStudents = async () => {
+    try {
+      const data = await userService.getStudents(user.grade, user.section);
+      const students = data.map((s: any) => ({
+        id: s.id,
+        name: s.profiles.name,
+        email: s.profiles.email,
+        studentId: s.student_id,
+        grade: s.grade,
+        section: s.section,
+        role: 'student'
+      }));
+      setStudents(students);
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error loading students:', error);
+      setIsLoading(false);
     }
-
-    setStudents(gradeStudents);
-    setIsLoading(false);
   };
 
-  const loadGrades = () => {
-    const storedGrades = localStorage.getItem('grades');
-    if (storedGrades) {
-      setGrades(JSON.parse(storedGrades));
+  const loadGrades = async () => {
+    try {
+      const studentIds = students.map(s => s.id);
+      if (studentIds.length > 0) {
+        const data = await gradeService.getGradesForStudents(studentIds);
+        const formattedGrades = data.map((g: any) => ({
+          id: g.id,
+          studentId: g.student_id,
+          studentName: g.students?.profiles?.name || '',
+          subject: g.subject,
+          period1: g.period1,
+          period2: g.period2,
+          period3: g.period3,
+          exam1: g.exam1,
+          sem1Av: g.sem1_av,
+          period4: g.period4,
+          period5: g.period5,
+          period6: g.period6,
+          exam2: g.exam2,
+          sem2Av: g.sem2_av,
+          finalAverage: g.final_average,
+          comments: g.comments
+        }));
+        setGrades(formattedGrades);
+      }
+    } catch (error) {
+      console.error('Error loading grades:', error);
     }
   };
 
@@ -200,10 +226,9 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
   };
 
   const calculatePeriodRankings = () => {
-    const storedGrades = localStorage.getItem('grades');
-    if (!storedGrades) return [];
-
-    const allGrades = JSON.parse(storedGrades);
+    // Use grades from state (loaded from Supabase)
+    const classStudentIds = students.map(s => s.id);
+    const allGrades = grades.filter(g => classStudentIds.includes(g.studentId));
 
     // Calculate average for selected period for each student
     const studentAverages = students.map(student => {
@@ -317,86 +342,69 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
     localStorage.setItem('changeLog', JSON.stringify(changeLog));
   };
 
-  const handleSaveAllGrades = () => {
+  const handleSaveAllGrades = async () => {
     if (!selectedStudent) return;
 
-    const newGrades: Grade[] = [];
-    const updatedGradeIds: string[] = [];
-
-    // Remove existing grades for this student if in edit mode
-    let filteredGrades = editMode
-      ? grades.filter(g => g.studentId !== selectedStudent.id)
-      : grades;
+    const gradesToSave: any[] = [];
 
     // Process each subject that has data
     Object.values(subjectGrades).forEach(subjectGrade => {
       if (hasAnyGradeData(subjectGrade)) {
-        const sem1Av = calculateSemesterAverage(
-          subjectGrade.period1,
-          subjectGrade.period2,
-          subjectGrade.period3,
-          subjectGrade.exam1
-        );
-
-        const sem2Av = calculateSemesterAverage(
-          subjectGrade.period4,
-          subjectGrade.period5,
-          subjectGrade.period6,
-          subjectGrade.exam2
-        );
-
-        const finalAverage = calculateFinalAverage(sem1Av, sem2Av);
-
-        const grade: Grade = {
-          id: `${Date.now()}-${Math.random()}-${subjectGrade.subject}`,
-          studentId: selectedStudent.id,
-          studentName: selectedStudent.name,
+        const gradeData = {
+          student_id: selectedStudent.id,
           subject: subjectGrade.subject,
           period1: subjectGrade.period1 ? parseFloat(subjectGrade.period1) : undefined,
           period2: subjectGrade.period2 ? parseFloat(subjectGrade.period2) : undefined,
           period3: subjectGrade.period3 ? parseFloat(subjectGrade.period3) : undefined,
           exam1: subjectGrade.exam1 ? parseFloat(subjectGrade.exam1) : undefined,
-          sem1Av: sem1Av ? parseFloat(sem1Av) : undefined,
           period4: subjectGrade.period4 ? parseFloat(subjectGrade.period4) : undefined,
           period5: subjectGrade.period5 ? parseFloat(subjectGrade.period5) : undefined,
           period6: subjectGrade.period6 ? parseFloat(subjectGrade.period6) : undefined,
           exam2: subjectGrade.exam2 ? parseFloat(subjectGrade.exam2) : undefined,
-          sem2Av: sem2Av ? parseFloat(sem2Av) : undefined,
-          finalAverage: finalAverage ? parseFloat(finalAverage) : undefined,
           comments: subjectGrade.comments,
         };
 
-        newGrades.push(grade);
+        gradesToSave.push(gradeData);
       }
     });
 
-    if (newGrades.length === 0) {
+    if (gradesToSave.length === 0) {
       showNotification('Please add grades for at least one subject before saving.', 'error');
       return;
     }
 
-    const updatedGrades = [...filteredGrades, ...newGrades];
-    setGrades(updatedGrades);
-    localStorage.setItem('grades', JSON.stringify(updatedGrades));
-
-    // Log the change
-    logChange(
-      editMode ? 'UPDATE_GRADES' : 'ADD_GRADES',
-      {
-        studentId: selectedStudent.id,
-        studentName: selectedStudent.name,
-        subjectCount: newGrades.length,
-        subjects: newGrades.map(g => g.subject),
+    try {
+      // Save all grades to Supabase
+      for (const gradeData of gradesToSave) {
+        await gradeService.upsertGrade(gradeData);
       }
-    );
 
-    showNotification(
-      `Successfully ${editMode ? 'updated' : 'added'} grades for ${newGrades.length} subject(s)!`,
-      'success'
-    );
-    setShowAddGrade(false);
-    setSelectedStudent(null);
-    setEditMode(false);
+      // Log the change
+      logChange(
+        editMode ? 'UPDATE_GRADES' : 'ADD_GRADES',
+        {
+          studentId: selectedStudent.id,
+          studentName: selectedStudent.name,
+          subjectCount: gradesToSave.length,
+          subjects: gradesToSave.map(g => g.subject),
+        }
+      );
+
+      showNotification(
+        `Successfully ${editMode ? 'updated' : 'added'} grades for ${gradesToSave.length} subject(s)!`,
+        'success'
+      );
+
+      // Reload grades from Supabase
+      await loadGrades();
+
+      setShowAddGrade(false);
+      setSelectedStudent(null);
+      setEditMode(false);
+    } catch (error: any) {
+      console.error('Error saving grades:', error);
+      showNotification(error.message || 'Failed to save grades', 'error');
+    }
   };
 
   const getStudentGrades = (studentId: string) => {

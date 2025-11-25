@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import Notification from '../components/Notification';
+import { gradeService } from '../services/grade.service';
+import { userService } from '../services/user.service';
 
 interface User {
   id: string;
@@ -12,6 +14,7 @@ interface Student extends User {
   role: 'student';
   studentId: string;
   grade: string;
+  section?: string;
 }
 
 interface Grade {
@@ -81,129 +84,125 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
     setGradeNotifications([]);
   };
 
-  const getSponsorName = () => {
-    const storedUsers = localStorage.getItem('users');
-    if (!storedUsers) return;
-    const users = JSON.parse(storedUsers);
-    const sponsor = users.find((u: any) =>
-      u.role === 'sponsor' &&
-      u.grade === user.grade &&
-      // Match section if student has a section (for 7th and 8th grade)
-      (!user.section || u.section === user.section)
-    );
-    setSponsorName(sponsor ? sponsor.name : 'Not Assigned');
-  };
-
-  const loadGrades = () => {
-    const storedGrades = localStorage.getItem('grades');
-    if (storedGrades) {
-      const allGrades: Grade[] = JSON.parse(storedGrades);
-      const studentGrades = allGrades.filter(g => g.studentId === user.id);
-      setGrades(studentGrades);
+  const getSponsorName = async () => {
+    try {
+      // Get all sponsors for this grade and section
+      const sponsors = await userService.getSponsors(user.grade, user.section);
+      if (sponsors && sponsors.length > 0) {
+        setSponsorName(sponsors[0].profiles.name);
+      } else {
+        setSponsorName('Not Assigned');
+      }
+    } catch (error) {
+      console.error('Error loading sponsor:', error);
+      setSponsorName('Not Assigned');
     }
-    setIsLoading(false);
   };
 
-  const calculateRanking = () => {
-    const storedGrades = localStorage.getItem('grades');
-    const storedUsers = localStorage.getItem('users');
-
-    if (!storedGrades || !storedUsers) return;
-
-    const allGrades: Grade[] = JSON.parse(storedGrades);
-    const allUsers = JSON.parse(storedUsers);
-    // Filter students by grade AND section (for 7th and 8th grade)
-    const studentsInGrade = allUsers.filter((u: any) =>
-      u.role === 'student' &&
-      u.grade === user.grade &&
-      (!user.section || u.section === user.section)
-    );
-
-    // Calculate average for each student
-    const studentAverages = studentsInGrade.map((student: any) => {
-      const studentGrades = allGrades.filter(g => g.studentId === student.id);
-      const validAverages = studentGrades
-        .map(g => g.finalAverage)
-        .filter((avg): avg is number => avg !== undefined);
-
-      const average = validAverages.length > 0
-        ? validAverages.reduce((sum, avg) => sum + avg, 0) / validAverages.length
-        : 0;
-
-      return {
-        studentId: student.id,
-        average: average
-      };
-    });
-
-    // Sort by average (descending)
-    studentAverages.sort((a, b) => b.average - a.average);
-
-    // Find current student's position
-    const position = studentAverages.findIndex(s => s.studentId === user.id) + 1;
-
-    setRanking({
-      position: position || studentsInGrade.length,
-      total: studentsInGrade.length
-    });
+  const loadGrades = async () => {
+    try {
+      const data = await gradeService.getStudentGrades(user.id);
+      const formattedGrades = data.map((g: any) => ({
+        id: g.id,
+        studentId: g.student_id,
+        studentName: user.name,
+        subject: g.subject,
+        period1: g.period1,
+        period2: g.period2,
+        period3: g.period3,
+        exam1: g.exam1,
+        sem1Av: g.sem1_av,
+        period4: g.period4,
+        period5: g.period5,
+        period6: g.period6,
+        exam2: g.exam2,
+        sem2Av: g.sem2_av,
+        finalAverage: g.final_average,
+        comments: g.comments
+      }));
+      setGrades(formattedGrades);
+    } catch (error) {
+      console.error('Error loading grades:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const calculatePeriodRankings = () => {
-    const storedGrades = localStorage.getItem('grades');
-    const storedUsers = localStorage.getItem('users');
+  const calculateRanking = async () => {
+    try {
+      const rankings = await gradeService.getClassRankings(user.grade, user.section);
+      const total = rankings.length;
+      const studentRanking = rankings.find((r: any) => r.id === user.id);
 
-    if (!storedGrades || !storedUsers) return;
+      if (studentRanking) {
+        setRanking({
+          position: studentRanking.class_rank,
+          total: total
+        });
+      } else {
+        setRanking({
+          position: total,
+          total: total
+        });
+      }
+    } catch (error) {
+      console.error('Error calculating ranking:', error);
+    }
+  };
 
-    const allGrades: Grade[] = JSON.parse(storedGrades);
-    const allUsers = JSON.parse(storedUsers);
-    // Filter students by grade AND section (for 7th and 8th grade)
-    const studentsInGrade = allUsers.filter((u: any) =>
-      u.role === 'student' &&
-      u.grade === user.grade &&
-      (!user.section || u.section === user.section)
-    );
+  const calculatePeriodRankings = async () => {
+    try {
+      // Get all students in this grade/section
+      const students = await userService.getStudents(user.grade, user.section);
+      const studentIds = students.map((s: any) => s.id);
 
-    const periods = ['period1', 'period2', 'period3', 'exam1', 'period4', 'period5', 'period6', 'exam2'] as const;
-    const rankings: {[key: string]: {position: number, total: number}} = {};
+      // Get all grades for these students
+      const allGrades = await gradeService.getGradesForStudents(studentIds);
 
-    periods.forEach(period => {
-      // Calculate period average for each student
-      const studentPeriodAverages = studentsInGrade.map((student: any) => {
-        const studentGrades = allGrades.filter(g => g.studentId === student.id);
-        const values = studentGrades
-          .map(g => g[period])
-          .filter((val): val is number => val !== undefined && !isNaN(val));
+      const periods = ['period1', 'period2', 'period3', 'exam1', 'period4', 'period5', 'period6', 'exam2'] as const;
+      const rankings: {[key: string]: {position: number, total: number}} = {};
 
-        const average = values.length > 0
-          ? values.reduce((sum, val) => sum + val, 0) / values.length
-          : 0;
+      periods.forEach(period => {
+        // Calculate period average for each student
+        const studentPeriodAverages = students.map((student: any) => {
+          const studentGrades = allGrades.filter((g: any) => g.student_id === student.id);
+          const values = studentGrades
+            .map((g: any) => g[period])
+            .filter((val: any) => val !== undefined && !isNaN(val) && val !== null);
 
-        return {
-          studentId: student.id,
-          average: average
-        };
+          const average = values.length > 0
+            ? values.reduce((sum: number, val: number) => sum + val, 0) / values.length
+            : 0;
+
+          return {
+            studentId: student.id,
+            average: average
+          };
+        });
+
+        // Filter out students with no grades for this period
+        const studentsWithGrades = studentPeriodAverages.filter(s => s.average > 0);
+
+        if (studentsWithGrades.length > 0) {
+          // Sort by average (descending)
+          studentsWithGrades.sort((a, b) => b.average - a.average);
+
+          // Find current student's position
+          const position = studentsWithGrades.findIndex(s => s.studentId === user.id) + 1;
+
+          if (position > 0) {
+            rankings[period] = {
+              position: position,
+              total: studentsWithGrades.length
+            };
+          }
+        }
       });
 
-      // Filter out students with no grades for this period
-      const studentsWithGrades = studentPeriodAverages.filter(s => s.average > 0);
-
-      if (studentsWithGrades.length > 0) {
-        // Sort by average (descending)
-        studentsWithGrades.sort((a, b) => b.average - a.average);
-
-        // Find current student's position
-        const position = studentsWithGrades.findIndex(s => s.studentId === user.id) + 1;
-
-        if (position > 0) {
-          rankings[period] = {
-            position: position,
-            total: studentsWithGrades.length
-          };
-        }
-      }
-    });
-
-    setPeriodRankings(rankings);
+      setPeriodRankings(rankings);
+    } catch (error) {
+      console.error('Error calculating period rankings:', error);
+    }
   };
 
   const calculateOverallAverage = () => {
