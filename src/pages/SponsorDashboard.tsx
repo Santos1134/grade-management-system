@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Notification from '../components/Notification';
 import { userService } from '../services/user.service';
 import { gradeService } from '../services/grade.service';
+import { auditService } from '../services/audit.service';
 
 interface User {
   id: string;
@@ -13,6 +14,7 @@ interface User {
 interface Sponsor extends User {
   role: 'sponsor';
   grade: string;
+  section?: string;
 }
 
 interface Grade {
@@ -328,18 +330,15 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
            subjectGrade.period6 || subjectGrade.exam2 || subjectGrade.comments;
   };
 
-  const logChange = (action: string, details: any) => {
-    const log = {
-      timestamp: new Date().toISOString(),
-      user: user.name,
-      userId: user.id,
-      action,
-      details,
-    };
-
-    const changeLog = JSON.parse(localStorage.getItem('changeLog') || '[]');
-    changeLog.push(log);
-    localStorage.setItem('changeLog', JSON.stringify(changeLog));
+  const logChange = async (action: string, details: any) => {
+    try {
+      await auditService.logAction({
+        action,
+        details
+      });
+    } catch (error) {
+      console.error('Error logging action:', error);
+    }
   };
 
   const handleSaveAllGrades = async () => {
@@ -380,7 +379,7 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
       }
 
       // Log the change
-      logChange(
+      await logChange(
         editMode ? 'UPDATE_GRADES' : 'ADD_GRADES',
         {
           studentId: selectedStudent.id,
@@ -465,47 +464,49 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
 
       {/* Header */}
       <header className="bg-gradient-to-r from-green-600 to-green-800 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Sponsor Dashboard</h1>
-            <p className="text-sm text-green-100">
-              {user.name} - {user.grade}{user.section ? ` Section ${user.section}` : ''} Sponsor
-            </p>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+          <div className="flex justify-between items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-white truncate">Sponsor Dashboard</h1>
+              <p className="text-xs sm:text-sm text-green-100 truncate">
+                {user.name} - {user.grade}{user.section ? ` Section ${user.section}` : ''} Sponsor
+              </p>
+            </div>
+            <button
+              onClick={onLogout}
+              className="px-3 sm:px-4 py-2 bg-white text-green-600 rounded-lg hover:bg-green-50 transition font-semibold text-sm sm:text-base min-h-[44px] flex-shrink-0"
+            >
+              Logout
+            </button>
           </div>
-          <button
-            onClick={onLogout}
-            className="px-4 py-2 bg-white text-green-600 rounded-lg hover:bg-green-50 transition font-semibold"
-          >
-            Logout
-          </button>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         {/* Stats */}
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6 mb-6 sm:mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <div>
-              <p className="text-sm text-gray-600">Assigned Class</p>
-              <p className="text-2xl font-bold text-green-600">
+              <p className="text-xs sm:text-sm text-gray-600">Assigned Class</p>
+              <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-600 truncate">
                 {user.grade}{user.section ? ` (${user.section})` : ''}
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Total Students</p>
-              <p className="text-2xl font-bold text-gray-900">{students.length}</p>
+              <p className="text-xs sm:text-sm text-gray-600">Total Students</p>
+              <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">{students.length}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Student Grade Entry</p>
-              <p className="text-2xl font-bold text-gray-900">{getClassGradesCount()}</p>
+              <p className="text-xs sm:text-sm text-gray-600">Grade Entry</p>
+              <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">{getClassGradesCount()}</p>
             </div>
             <div>
               <button
                 onClick={() => setShowStats(!showStats)}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold"
+                className="w-full px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold text-sm sm:text-base min-h-[48px]"
               >
-                {showStats ? 'Hide' : 'View'} Class Rankings
+                {showStats ? 'Hide' : 'View'} Rankings
               </button>
             </div>
           </div>
@@ -650,47 +651,49 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
             </h2>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grades Entered</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                </tr>
-              </thead>
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <div className="inline-block min-w-full align-middle">
+              <div className="overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Student ID</th>
+                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Name</th>
+                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Email</th>
+                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Grades</th>
+                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Actions</th>
+                    </tr>
+                  </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {students.map((student) => (
                   <tr key={student.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
                       {student.studentId}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">
                       {student.name}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600">
                       {student.email}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {getStudentGrades(student.id).length} subjects
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600">
+                      {getStudentGrades(student.id).length}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm space-x-2">
                       <button
                         onClick={() => {
                           setSelectedStudent(student);
                           setShowAddGrade(true);
                         }}
-                        className="text-green-600 hover:text-green-800 font-semibold mr-4"
+                        className="text-green-600 hover:text-green-800 font-semibold"
                       >
-                        Add Grades
+                        Add
                       </button>
                       <button
                         onClick={() => setSelectedStudent(student)}
                         className="text-blue-600 hover:text-blue-800 font-semibold"
                       >
-                        View Grades
+                        View
                       </button>
                     </td>
                   </tr>
@@ -941,19 +944,19 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                     {/* Semester and Final Averages */}
                     <div className="flex items-center gap-2 bg-blue-100 px-3 py-2 rounded-lg">
                       <span className="text-xs font-medium text-blue-800">Semester 1 Average:</span>
-                      <span className={`text-base font-bold ${getGradeColorClass(calculateSemester1Average()) || 'text-blue-900'}`}>
+                      <span className={`text-base font-bold ${getGradeColorClass(calculateSemester1Average() ?? undefined) || 'text-blue-900'}`}>
                         {calculateSemester1Average() || '-'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 bg-purple-100 px-3 py-2 rounded-lg">
                       <span className="text-xs font-medium text-purple-800">Semester 2 Average:</span>
-                      <span className={`text-base font-bold ${getGradeColorClass(calculateSemester2Average()) || 'text-purple-900'}`}>
+                      <span className={`text-base font-bold ${getGradeColorClass(calculateSemester2Average() ?? undefined) || 'text-purple-900'}`}>
                         {calculateSemester2Average() || '-'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 bg-green-100 px-3 py-2 rounded-lg">
                       <span className="text-xs font-medium text-green-800">Final Average:</span>
-                      <span className={`text-base font-bold ${getGradeColorClass(calculateFinalAverageAcrossSubjects()) || 'text-green-900'}`}>
+                      <span className={`text-base font-bold ${getGradeColorClass(calculateFinalAverageAcrossSubjects() ?? undefined) || 'text-green-900'}`}>
                         {calculateFinalAverageAcrossSubjects() || '-'}
                       </span>
                     </div>

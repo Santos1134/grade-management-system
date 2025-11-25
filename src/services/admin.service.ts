@@ -106,7 +106,7 @@ export const adminService = {
 
   // Delete user
   async deleteUser(userId: string) {
-    // Delete from profiles (will cascade to other tables)
+    // Delete from profiles (will cascade to other tables AND auth.users via trigger)
     const { error: profileError } = await supabase
       .from('profiles')
       .delete()
@@ -114,8 +114,9 @@ export const adminService = {
 
     if (profileError) throw profileError;
 
-    // Note: Can't delete from auth without service role key
-    // User will still exist in auth but won't be able to access anything
+    // Note: The database trigger 'on_profile_delete' automatically deletes the user from auth.users
+    // This allows you to recreate a user with the same email after deletion
+    // See AUTO_DELETE_AUTH_USERS.sql for the trigger implementation
   },
 
   // Get all users with their details

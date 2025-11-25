@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Notification from '../components/Notification';
 import { gradeService } from '../services/grade.service';
 import { userService } from '../services/user.service';
+import { auditService } from '../services/audit.service';
 
 interface User {
   id: string;
@@ -59,29 +60,30 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
     checkForNewGrades();
   }, [user.id]);
 
-  const checkForNewGrades = () => {
-    // Check audit log for grade updates for this student
-    const changeLog = JSON.parse(localStorage.getItem('changeLog') || '[]');
-    const lastChecked = localStorage.getItem(`lastChecked_${user.id}`) || new Date(0).toISOString();
+  const checkForNewGrades = async () => {
+    try {
+      // Check Supabase audit log for grade updates for this student
+      const newGradeUpdates = await auditService.getGradeNotifications(user.id);
 
-    const newGradeUpdates = changeLog.filter((log: any) =>
-      (log.action === 'ADD_GRADES' || log.action === 'UPDATE_GRADES') &&
-      log.details.studentId === user.id &&
-      new Date(log.timestamp) > new Date(lastChecked)
-    );
-
-    if (newGradeUpdates.length > 0) {
-      setGradeNotifications(newGradeUpdates);
-      setNotification({
-        message: `You have ${newGradeUpdates.length} new grade update(s)! Click the bell icon to view.`,
-        type: 'info'
-      });
+      if (newGradeUpdates.length > 0) {
+        setGradeNotifications(newGradeUpdates);
+        setNotification({
+          message: `You have ${newGradeUpdates.length} new grade update(s)! Click the bell icon to view.`,
+          type: 'info'
+        });
+      }
+    } catch (error) {
+      console.error('Error checking for new grades:', error);
     }
   };
 
-  const markNotificationsAsRead = () => {
-    localStorage.setItem(`lastChecked_${user.id}`, new Date().toISOString());
-    setGradeNotifications([]);
+  const markNotificationsAsRead = async () => {
+    try {
+      await auditService.updateLastChecked(user.id);
+      setGradeNotifications([]);
+    } catch (error) {
+      console.error('Error marking notifications as read:', error);
+    }
   };
 
   const getSponsorName = async () => {
@@ -251,12 +253,13 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
 
       {/* Header */}
       <header className="bg-gradient-to-r from-green-600 to-green-800 shadow-lg print:bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-white print:text-gray-900">Student Dashboard</h1>
-            <p className="text-sm text-green-100 print:text-gray-600">Welcome, {user.name}</p>
-          </div>
-          <div className="flex gap-2 print:hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+          <div className="flex justify-between items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-white print:text-gray-900 truncate">Student Dashboard</h1>
+              <p className="text-xs sm:text-sm text-green-100 print:text-gray-600 truncate">Welcome, {user.name}</p>
+            </div>
+            <div className="flex gap-1 sm:gap-2 print:hidden flex-shrink-0">
             {/* Notification Bell */}
             <button
               onClick={() => {
@@ -265,11 +268,12 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
                   markNotificationsAsRead();
                 }
               }}
-              className="relative px-4 py-2 bg-white text-green-600 rounded-lg hover:bg-green-50 transition font-semibold flex items-center gap-2"
+              className="relative p-2 sm:px-3 sm:py-2 bg-white text-green-600 rounded-lg hover:bg-green-50 transition font-semibold flex items-center gap-1 sm:gap-2 min-h-[44px] min-w-[44px]"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
+              <span className="hidden sm:inline text-sm">Alerts</span>
               {gradeNotifications.length > 0 && (
                 <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                   {gradeNotifications.length}
@@ -278,16 +282,16 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
             </button>
             <button
               onClick={handlePrint}
-              className="px-4 py-2 bg-white text-green-600 rounded-lg hover:bg-green-50 transition font-semibold flex items-center gap-2"
+              className="p-2 sm:px-3 sm:py-2 bg-white text-green-600 rounded-lg hover:bg-green-50 transition font-semibold flex items-center gap-1 sm:gap-2 min-h-[44px] min-w-[44px]"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
               </svg>
-              Print Grade Sheet
+              <span className="hidden md:inline text-sm">Print</span>
             </button>
             <button
               onClick={onLogout}
-              className="px-4 py-2 bg-white text-green-600 rounded-lg hover:bg-green-50 transition font-semibold"
+              className="px-3 sm:px-4 py-2 bg-white text-green-600 rounded-lg hover:bg-green-50 transition font-semibold text-sm sm:text-base min-h-[44px]"
             >
               Logout
             </button>
@@ -296,7 +300,7 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         {/* Print Header - Only visible when printing */}
         <div className="hidden print:block mb-6 text-center">
           <h1 className="text-2xl font-bold text-green-800">St. Peter Claver Catholic High School</h1>
@@ -304,30 +308,30 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
         </div>
 
         {/* Stats Card */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
             <div>
-              <p className="text-sm text-gray-600">Student ID</p>
-              <p className="text-2xl font-bold text-gray-900">{user.studentId}</p>
+              <p className="text-xs sm:text-sm text-gray-600">Student ID</p>
+              <p className="text-base sm:text-lg md:text-2xl font-bold text-gray-900 truncate">{user.studentId}</p>
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <p className="text-xs sm:text-sm text-gray-600">Student Name</p>
+              <p className="text-base sm:text-lg md:text-2xl font-bold text-gray-900 truncate">{user.name}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Student Name</p>
-              <p className="text-2xl font-bold text-gray-900">{user.name}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Grade Level</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-xs sm:text-sm text-gray-600">Grade Level</p>
+              <p className="text-base sm:text-lg md:text-2xl font-bold text-gray-900 truncate">
                 {user.grade}{user.section ? ` (${user.section})` : ''}
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Class Sponsor</p>
-              <p className="text-2xl font-bold text-gray-900">{sponsorName}</p>
+              <p className="text-xs sm:text-sm text-gray-600">Class Sponsor</p>
+              <p className="text-base sm:text-lg md:text-2xl font-bold text-gray-900 truncate">{sponsorName}</p>
             </div>
             {ranking && ranking.position > 0 && calculateOverallAverage() !== '0.00' && (
               <div>
-                <p className="text-sm text-gray-600">Class Ranking</p>
-                <p className="text-2xl font-bold text-green-600">
+                <p className="text-xs sm:text-sm text-gray-600">Class Ranking</p>
+                <p className="text-base sm:text-lg md:text-2xl font-bold text-green-600">
                   {ranking.position} / {ranking.total}
                 </p>
               </div>
@@ -343,9 +347,9 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
 
         {/* Period Averages Section */}
         {grades.length > 0 && (
-          <div className="bg-white rounded-lg shadow p-6 mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Period Averages & Rankings (Across All Subjects)</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Period Averages & Rankings</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
               {/* Semester 1 Periods */}
               <div className="bg-blue-50 rounded-lg p-4">
                 <p className="text-xs font-medium text-blue-700 mb-1">1st Period</p>
@@ -443,55 +447,59 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
 
         {/* Grades Table */}
         <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">Grade Report</h2>
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
+            <h2 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900">Grade Report</h2>
           </div>
 
           {isLoading ? (
-            <div className="p-8 text-center text-gray-600">Loading grades...</div>
+            <div className="p-6 sm:p-8 text-center text-sm sm:text-base text-gray-600">Loading grades...</div>
           ) : grades.length === 0 ? (
-            <div className="p-8 text-center text-gray-600">No grades available yet</div>
+            <div className="p-6 sm:p-8 text-center text-sm sm:text-base text-gray-600">No grades available yet</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">1st</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">2nd</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">3rd</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Exam</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sem Avg</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">4th</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">5th</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">6th</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Exam</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sem Avg</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Final</th>
-                  </tr>
-                </thead>
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <div className="inline-block min-w-full align-middle">
+                <div className="overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 bg-gray-50 z-10">Subject</th>
+                        <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">1st</th>
+                        <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">2nd</th>
+                        <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">3rd</th>
+                        <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Exam</th>
+                        <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Sem Avg</th>
+                        <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">4th</th>
+                        <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">5th</th>
+                        <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">6th</th>
+                        <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Exam</th>
+                        <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Sem Avg</th>
+                        <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Final</th>
+                      </tr>
+                    </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {getSubjectsForGrade().map((subject) => {
                     const grade = grades.find(g => g.subject === subject);
                     return (
                       <tr key={subject} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-900">{subject}</td>
-                        <td className="px-4 py-3 text-gray-600">{grade?.period1 || '-'}</td>
-                        <td className="px-4 py-3 text-gray-600">{grade?.period2 || '-'}</td>
-                        <td className="px-4 py-3 text-gray-600">{grade?.period3 || '-'}</td>
-                        <td className="px-4 py-3 text-gray-600">{grade?.exam1 || '-'}</td>
-                        <td className="px-4 py-3 font-semibold text-blue-600">{grade?.sem1Av?.toFixed(2) || '-'}</td>
-                        <td className="px-4 py-3 text-gray-600">{grade?.period4 || '-'}</td>
-                        <td className="px-4 py-3 text-gray-600">{grade?.period5 || '-'}</td>
-                        <td className="px-4 py-3 text-gray-600">{grade?.period6 || '-'}</td>
-                        <td className="px-4 py-3 text-gray-600">{grade?.exam2 || '-'}</td>
-                        <td className="px-4 py-3 font-semibold text-blue-600">{grade?.sem2Av?.toFixed(2) || '-'}</td>
-                        <td className="px-4 py-3 font-bold text-green-600">{grade?.finalAverage?.toFixed(2) || '-'}</td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-3 font-medium text-gray-900 sticky left-0 bg-white whitespace-nowrap">{subject}</td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-600 whitespace-nowrap">{grade?.period1 || '-'}</td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-600 whitespace-nowrap">{grade?.period2 || '-'}</td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-600 whitespace-nowrap">{grade?.period3 || '-'}</td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-600 whitespace-nowrap">{grade?.exam1 || '-'}</td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-3 font-semibold text-blue-600 whitespace-nowrap">{grade?.sem1Av?.toFixed(2) || '-'}</td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-600 whitespace-nowrap">{grade?.period4 || '-'}</td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-600 whitespace-nowrap">{grade?.period5 || '-'}</td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-600 whitespace-nowrap">{grade?.period6 || '-'}</td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-600 whitespace-nowrap">{grade?.exam2 || '-'}</td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-3 font-semibold text-blue-600 whitespace-nowrap">{grade?.sem2Av?.toFixed(2) || '-'}</td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-3 font-bold text-green-600 whitespace-nowrap">{grade?.finalAverage?.toFixed(2) || '-'}</td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
+            </div>
+            </div>
             </div>
           )}
         </div>
@@ -528,10 +536,10 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
                             {notification.action === 'ADD_GRADES' ? 'New grades added' : 'Grades updated'}
                           </p>
                           <p className="text-sm text-gray-600 mt-1">
-                            <strong>By:</strong> {notification.user}
+                            <strong>By:</strong> {notification.user_name}
                           </p>
                           <p className="text-sm text-gray-600">
-                            <strong>Subjects:</strong> {notification.details.subjects?.join(', ')} ({notification.details.subjectCount} subjects)
+                            <strong>Subjects:</strong> {notification.details?.subjects?.join(', ')} ({notification.details?.subjectCount} subjects)
                           </p>
                           <p className="text-xs text-gray-500 mt-2">
                             {new Date(notification.timestamp).toLocaleString()}

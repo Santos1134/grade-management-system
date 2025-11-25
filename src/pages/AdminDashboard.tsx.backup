@@ -1,8 +1,5 @@
 import { useState, useEffect } from 'react';
 import Notification from '../components/Notification';
-import { adminService } from '../services/admin.service';
-import { auditService } from '../services/audit.service';
-import { gradeService } from '../services/grade.service';
 
 interface Admin {
   id: string;
@@ -53,16 +50,12 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [showAuditTrail, setShowAuditTrail] = useState(false);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
-  const [periodRankings, setPeriodRankings] = useState<any[]>([]);
 
-  // Load users from Supabase
-  const loadUsers = async () => {
-    try {
-      const data = await adminService.getAllUsers();
-      setUsers(data || []);
-    } catch (error) {
-      console.error('Error loading users:', error);
-      showNotification('Failed to load users', 'error');
+  // Load users from localStorage
+  const loadUsers = () => {
+    const storedUsers = localStorage.getItem('users');
+    if (storedUsers) {
+      setUsers(JSON.parse(storedUsers));
     }
   };
 
@@ -71,25 +64,9 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     loadAuditLogs();
   }, []);
 
-  useEffect(() => {
-    if (showPeriodRankings && users.length > 0) {
-      loadPeriodRankings();
-    }
-  }, [showPeriodRankings, selectedPeriod, selectedGradeForRanking, rankingView, users]);
-
-  const loadPeriodRankings = async () => {
-    const rankings = await calculatePeriodRankings();
-    setPeriodRankings(rankings);
-  };
-
-  const loadAuditLogs = async () => {
-    try {
-      const logs = await auditService.getAllLogs();
-      setAuditLogs(logs); // Already sorted by timestamp DESC
-    } catch (error) {
-      console.error('Error loading audit logs:', error);
-      setAuditLogs([]);
-    }
+  const loadAuditLogs = () => {
+    const logs = JSON.parse(localStorage.getItem('changeLog') || '[]');
+    setAuditLogs(logs.reverse()); // Show most recent first
   };
 
   const showNotification = (message: string, type: 'success' | 'error' | 'info') => {
@@ -112,16 +89,28 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     return { valid: true, message: '' };
   };
 
-  const generateStudentId = async () => {
-    try {
-      return await adminService.generateStudentId();
-    } catch (error) {
-      console.error('Error generating student ID:', error);
-      return 'STU0001';
-    }
+  const generateStudentId = () => {
+    const storedUsers = localStorage.getItem('users');
+    const users = storedUsers ? JSON.parse(storedUsers) : [];
+    const students = users.filter((u: any) => u.role === 'student');
+
+    // Find the highest student ID number
+    let maxId = 0;
+    students.forEach((student: any) => {
+      if (student.studentId) {
+        const numPart = parseInt(student.studentId.replace('STU', ''));
+        if (!isNaN(numPart) && numPart > maxId) {
+          maxId = numPart;
+        }
+      }
+    });
+
+    // Generate next ID
+    const nextId = maxId + 1;
+    return `STU${nextId.toString().padStart(4, '0')}`;
   };
 
-  const handleCreateUser = async (e: React.FormEvent) => {
+  const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validate password
@@ -133,85 +122,170 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     }
     setPasswordError('');
 
-    try {
-      // Auto-generate email
-      const autoEmail = generateEmail(formData.name);
+    const storedUsers = localStorage.getItem('users');
+    const users = storedUsers ? JSON.parse(storedUsers) : [];
 
-      // Auto-generate student ID for students
-      const studentId = userType === 'student' ? await generateStudentId() : undefined;
+    // Auto-generate email
+    const autoEmail = generateEmail(formData.name);
 
-      // Create user in Supabase
-      await adminService.createUser({
-        email: autoEmail,
-        password: formData.password,
-        name: formData.name,
-        role: userType!,
+    // Check if email already exists
+    if (users.find((u: any) => u.email === autoEmail)) {
+      showNotification('Email already exists!', 'error');
+      return;
+    }
+
+    // Check for duplicate sponsor assignment
+    if (userType === 'sponsor') {
+      const existingSponsor = users.find((u: any) =>
+        u.role === 'sponsor' &&
+        u.grade === formData.grade &&
+        u.section === (formData.section || undefined)
+      );
+      if (existingSponsor) {
+        const gradeLabel = formData.section
+          ? `${formData.grade} Section ${formData.section}`
+          : formData.grade;
+        showNotification(`A sponsor is already assigned to ${gradeLabel}: ${existingSponsor.name}`, 'error');
+        return;
+      }
+    }
+
+    // Auto-generate student ID for students
+    const studentId = userType === 'student' ? generateStudentId() : undefined;
+
+    const newUser = {
+      id: Date.now().toString(),
+      email: autoEmail,
+      password: formData.password,
+      name: formData.name,
+      role: userType,
+      ...(userType === 'student' ? {
         studentId: studentId,
         grade: formData.grade,
         section: formData.section || undefined,
-      });
+      } : {
+        grade: formData.grade,
+        section: formData.section || undefined,
+      }),
+    };
 
-      showNotification(
-        `${userType === 'student' ? 'Student' : 'Sponsor'} account created successfully! Email: ${autoEmail}`,
-        'success'
-      );
+    users.push(newUser);
+    localStorage.setItem('users', JSON.stringify(users));
 
-      // Reset form
-      setFormData({
-        password: '',
-        name: '',
-        role: 'student',
-        studentId: '',
-        grade: '',
-        section: '',
-      });
-      setUserType(null);
-      setShowCreateUser(false);
+    // Log the change
+    const changeLog = JSON.parse(localStorage.getItem('changeLog') || '[]');
+    changeLog.push({
+      timestamp: new Date().toISOString(),
+      user: user.name,
+      userId: user.id,
+      action: 'CREATE_USER',
+      details: {
+        newUserId: newUser.id,
+        newUserName: newUser.name,
+        newUserRole: newUser.role,
+        newUserEmail: newUser.email,
+      },
+    });
+    localStorage.setItem('changeLog', JSON.stringify(changeLog));
 
-      // Reload users
-      await loadUsers();
-    } catch (error: any) {
-      console.error('Error creating user:', error);
-      showNotification(error.message || 'Failed to create user', 'error');
-    }
+    showNotification(
+      `${userType === 'student' ? 'Student' : 'Sponsor'} account created successfully! Email: ${autoEmail}`,
+      'success'
+    );
+
+    // Reset form
+    setFormData({
+      password: '',
+      name: '',
+      role: 'student',
+      studentId: '',
+      grade: '',
+      section: '',
+    });
+    setUserType(null);
+    setShowCreateUser(false);
+    loadUsers();
   };
 
   const handleDeleteUser = (userId: string, userName: string) => {
     setDeleteConfirm({ userId, userName });
   };
 
-  const confirmDelete = async () => {
+  const confirmDelete = () => {
     if (!deleteConfirm) return;
 
-    try {
-      await adminService.deleteUser(deleteConfirm.userId);
-      showNotification('User deleted successfully!', 'success');
-      setDeleteConfirm(null);
-      await loadUsers();
-    } catch (error: any) {
-      console.error('Error deleting user:', error);
-      showNotification(error.message || 'Failed to delete user', 'error');
+    const storedUsers = localStorage.getItem('users');
+    const users = storedUsers ? JSON.parse(storedUsers) : [];
+    const filteredUsers = users.filter((u: any) => u.id !== deleteConfirm.userId);
+    localStorage.setItem('users', JSON.stringify(filteredUsers));
+
+    // Log the change
+    const changeLog = JSON.parse(localStorage.getItem('changeLog') || '[]');
+    changeLog.push({
+      timestamp: new Date().toISOString(),
+      user: user.name,
+      userId: user.id,
+      action: 'DELETE_USER',
+      details: {
+        deletedUserId: deleteConfirm.userId,
+        deletedUserName: deleteConfirm.userName,
+      },
+    });
+    localStorage.setItem('changeLog', JSON.stringify(changeLog));
+
+    showNotification('User deleted successfully!', 'success');
+    setDeleteConfirm(null);
+    loadUsers();
+  };
+
+  const handleResetPassword = (userId: string, userName: string) => {
+    const newPassword = prompt(`Enter new password for ${userName}:`);
+    if (!newPassword) return;
+
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      showNotification(passwordValidation.message, 'error');
+      return;
     }
-  };
 
-  const handleResetPassword = async (userId: string, userName: string) => {
-    showNotification(
-      'Password reset requires service role access. Please reset passwords through Supabase Dashboard: Authentication > Users',
-      'error'
+    const storedUsers = localStorage.getItem('users');
+    const users = storedUsers ? JSON.parse(storedUsers) : [];
+    const updatedUsers = users.map((u: any) =>
+      u.id === userId ? { ...u, password: newPassword } : u
     );
+    localStorage.setItem('users', JSON.stringify(updatedUsers));
 
-    // Note: To reset a user's password in Supabase:
-    // 1. Go to Supabase Dashboard
-    // 2. Click Authentication > Users
-    // 3. Find the user and click on them
-    // 4. Update their password
-    //
-    // Alternatively, implement a password reset email flow
+    // Log the change
+    const changeLog = JSON.parse(localStorage.getItem('changeLog') || '[]');
+    changeLog.push({
+      timestamp: new Date().toISOString(),
+      user: user.name,
+      userId: user.id,
+      action: 'RESET_PASSWORD',
+      details: {
+        targetUserId: userId,
+        targetUserName: userName,
+      },
+    });
+    localStorage.setItem('changeLog', JSON.stringify(changeLog));
+
+    showNotification(`Password reset successfully for ${userName}!`, 'success');
+    loadUsers();
   };
 
-  const handleChangePassword = async () => {
+  const handleChangePassword = () => {
     if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
       showNotification('Please fill in all password fields', 'error');
+      return;
+    }
+
+    // Verify current password
+    const storedUsers = localStorage.getItem('users');
+    const users = storedUsers ? JSON.parse(storedUsers) : [];
+    const currentAdmin = users.find((u: any) => u.id === user.id && u.role === 'admin');
+
+    if (!currentAdmin || currentAdmin.password !== passwordForm.currentPassword) {
+      showNotification('Current password is incorrect', 'error');
       return;
     }
 
@@ -228,26 +302,28 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
       return;
     }
 
-    try {
-      // Update password in Supabase
-      await adminService.changePassword(passwordForm.newPassword);
+    // Update password
+    const updatedUsers = users.map((u: any) =>
+      u.id === user.id ? { ...u, password: passwordForm.newPassword } : u
+    );
+    localStorage.setItem('users', JSON.stringify(updatedUsers));
 
-      // Log the change
-      await auditService.logAction({
-        action: 'CHANGE_OWN_PASSWORD',
-        details: {
-          message: 'Admin changed their own password',
-        },
-      });
+    // Log the change
+    const changeLog = JSON.parse(localStorage.getItem('changeLog') || '[]');
+    changeLog.push({
+      timestamp: new Date().toISOString(),
+      user: user.name,
+      userId: user.id,
+      action: 'CHANGE_OWN_PASSWORD',
+      details: {
+        message: 'Admin changed their own password',
+      },
+    });
+    localStorage.setItem('changeLog', JSON.stringify(changeLog));
 
-      showNotification('Password changed successfully!', 'success');
-      setShowChangePassword(false);
-      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      await loadAuditLogs();
-    } catch (error: any) {
-      console.error('Error changing password:', error);
-      showNotification(error.message || 'Failed to change password', 'error');
-    }
+    showNotification('Password changed successfully!', 'success');
+    setShowChangePassword(false);
+    setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
   };
 
   const getFilteredUsers = () => {
@@ -280,30 +356,12 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     return (parseFloat(sem1) + parseFloat(sem2)) / 2;
   };
 
-  const calculatePeriodRankings = async () => {
-    try {
-      const students = users.filter(u => u.role === 'student');
-      if (students.length === 0) return [];
+  const calculatePeriodRankings = () => {
+    const storedGrades = localStorage.getItem('grades');
+    if (!storedGrades) return [];
 
-      const studentIds = students.map(s => s.id);
-      const gradesData = await gradeService.getGradesForStudents(studentIds);
-
-      // Convert to the format expected by the rest of the function
-      const allGrades = gradesData.map((g: any) => ({
-        studentId: g.student_id,
-        subject: g.subject,
-        period1: g.period1,
-        period2: g.period2,
-        period3: g.period3,
-        exam1: g.exam1,
-        sem1Av: g.sem1_av,
-        period4: g.period4,
-        period5: g.period5,
-        period6: g.period6,
-        exam2: g.exam2,
-        sem2Av: g.sem2_av,
-        finalAverage: g.final_average,
-      }));
+    const allGrades = JSON.parse(storedGrades);
+    const students = users.filter(u => u.role === 'student');
 
     // Filter by selected grade if not 'all'
     let filteredStudents: any[];
@@ -370,39 +428,20 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
       .filter(s => s.hasGrades)
       .sort((a, b) => b.average - a.average);
 
-      // If honor roll view, filter to only honor students (80%+)
-      if (rankingView === 'honor') {
-        return rankedStudents.filter(s => s.average >= 80);
-      }
-
-      return rankedStudents;
-    } catch (error) {
-      console.error('Error calculating rankings:', error);
-      return [];
+    // If honor roll view, filter to only honor students (80%+)
+    if (rankingView === 'honor') {
+      return rankedStudents.filter(s => s.average >= 80);
     }
+
+    return rankedStudents;
   };
 
-  const calculateHonorRoll = async () => {
-    try {
-      const students = users.filter(u => u.role === 'student');
-      if (students.length === 0) return { highHonor: [], honorRoll: [], honorRollMention: [] };
+  const calculateHonorRoll = () => {
+    const storedGrades = localStorage.getItem('grades');
+    if (!storedGrades) return { highHonor: [], honorRoll: [], honorRollMention: [] };
 
-      const studentIds = students.map(s => s.id);
-      const gradesData = await gradeService.getGradesForStudents(studentIds);
-
-      // Convert to the format expected by the rest of the function
-      const allGrades = gradesData.map((g: any) => ({
-        studentId: g.student_id,
-        subject: g.subject,
-        period1: g.period1,
-        period2: g.period2,
-        period3: g.period3,
-        exam1: g.exam1,
-        period4: g.period4,
-        period5: g.period5,
-        period6: g.period6,
-        exam2: g.exam2,
-      }));
+    const allGrades = JSON.parse(storedGrades);
+    const students = users.filter(u => u.role === 'student');
     const gradeClasses = ['7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 
     const honorStudentsByClass: Record<string, any[]> = {};
@@ -477,15 +516,11 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
       });
     });
 
-      return { highHonor, honorRoll, honorRollMention, byClass: honorStudentsByClass };
-    } catch (error) {
-      console.error('Error calculating honor roll:', error);
-      return { highHonor: [], honorRoll: [], honorRollMention: [] };
-    }
+    return { highHonor, honorRoll, honorRollMention, byClass: honorStudentsByClass };
   };
 
-  const printHonorRoll = async () => {
-    const honorData = await calculateHonorRoll();
+  const printHonorRoll = () => {
+    const honorData = calculateHonorRoll();
     const periodNames: Record<string, string> = {
       period1: '1st Period',
       period2: '2nd Period',
@@ -603,46 +638,44 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
       {/* Header */}
       <header className="bg-gradient-to-r from-green-600 to-green-800 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex-1 min-w-0">
-              <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-white truncate">Admin Dashboard</h1>
-              <p className="text-xs sm:text-sm text-green-100 truncate">Welcome, {user.name}</p>
-            </div>
-            <button
-              onClick={onLogout}
-              className="ml-2 px-3 sm:px-4 py-2 bg-white text-green-600 rounded-lg hover:bg-green-50 transition font-semibold text-sm sm:text-base min-h-[44px] flex-shrink-0"
-            >
-              Logout
-            </button>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
+            <p className="text-sm text-green-100">Welcome, {user.name}</p>
           </div>
+          <button
+            onClick={onLogout}
+            className="px-4 py-2 bg-white text-green-600 rounded-lg hover:bg-green-50 transition font-semibold"
+          >
+            Logout
+          </button>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
-        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex flex-col lg:flex-row gap-8">
           {/* Left Sidebar - Navigation & Stats */}
-          <aside className="lg:w-80 flex-shrink-0 space-y-4 sm:space-y-6">
+          <aside className="lg:w-80 flex-shrink-0 space-y-6">
             {/* Quick Actions Navigation */}
             <div className="bg-white rounded-lg shadow">
-              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
-                <h2 className="text-base sm:text-lg font-semibold text-gray-900">Quick Actions</h2>
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
               </div>
-              <nav className="p-3 sm:p-4 space-y-2 grid grid-cols-2 lg:grid-cols-1 gap-2">
+              <nav className="p-4 space-y-2">
                 <button
                   onClick={() => {
                     setShowCreateUser(true);
                     setUserType('student');
                   }}
-                  className="w-full flex flex-col lg:flex-row items-center gap-2 lg:gap-3 px-3 sm:px-4 py-3 text-center lg:text-left text-gray-700 hover:bg-blue-50 rounded-lg transition group min-h-[48px]"
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-blue-50 rounded-lg transition group"
                 >
-                  <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition flex-shrink-0">
-                    <svg className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                     </svg>
                   </div>
-                  <span className="font-medium text-xs sm:text-sm lg:text-base">Create Student</span>
+                  <span className="font-medium">Create Student</span>
                 </button>
 
                 <button
@@ -755,17 +788,17 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-3 sm:gap-4">
-              <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+            <div className="space-y-4">
+              <div className="bg-white rounded-lg shadow p-6">
                 <div className="flex items-center">
-                  <div className="p-2 sm:p-3 bg-blue-100 rounded-lg flex-shrink-0">
-                    <svg className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="p-3 bg-blue-100 rounded-lg">
+                    <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                     </svg>
                   </div>
-                  <div className="ml-3 sm:ml-4 min-w-0">
-                    <p className="text-xs sm:text-sm text-gray-600">Total Students</p>
-                    <p className="text-xl sm:text-2xl font-bold text-gray-900 truncate">
+                  <div className="ml-4">
+                    <p className="text-sm text-gray-600">Total Students</p>
+                    <p className="text-2xl font-bold text-gray-900">
                       {users.filter(u => u.role === 'student').length}
                     </p>
                   </div>
@@ -1176,11 +1209,12 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
               {/* Honor Roll Summary (only in honor view) */}
               {rankingView === 'honor' && (() => {
-                const highHonor = periodRankings.filter(s => s.average >= 90);
-                const honorRoll = periodRankings.filter(s => s.average >= 85 && s.average < 90);
-                const honorMention = periodRankings.filter(s => s.average >= 80 && s.average < 85);
+                const rankings = calculatePeriodRankings();
+                const highHonor = rankings.filter(s => s.average >= 90);
+                const honorRoll = rankings.filter(s => s.average >= 85 && s.average < 90);
+                const honorMention = rankings.filter(s => s.average >= 80 && s.average < 85);
 
-                return periodRankings.length > 0 ? (
+                return rankings.length > 0 ? (
                   <div className="grid grid-cols-3 gap-4 mb-6">
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                       <h3 className="text-sm font-medium text-yellow-900 mb-1">High Honor</h3>
@@ -1203,6 +1237,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
               {/* Rankings Table */}
               {(() => {
+                const rankings = calculatePeriodRankings();
                 const periodNames: Record<string, string> = {
                   period1: '1st Period',
                   period2: '2nd Period',
@@ -1217,7 +1252,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                   finalAvg: 'Final Average'
                 };
 
-                return periodRankings.length > 0 ? (
+                return rankings.length > 0 ? (
                   <div className="overflow-x-auto">
                     <div className="mb-4">
                       <h3 className="text-lg font-semibold text-gray-900">
@@ -1225,7 +1260,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                         {selectedGradeForRanking !== 'all' && ` - ${selectedGradeForRanking}`}
                       </h3>
                       <p className="text-sm text-gray-600 mt-1">
-                        Showing {periodRankings.length} student{periodRankings.length !== 1 ? 's' : ''} with grades
+                        Showing {rankings.length} student{rankings.length !== 1 ? 's' : ''} with grades
                       </p>
                     </div>
                     <table className="w-full">
@@ -1241,7 +1276,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {periodRankings.map((student, index) => {
+                        {rankings.map((student, index) => {
                           let honorLevel = '';
                           let badgeClass = '';
                           let rowClass = '';
@@ -1375,46 +1410,44 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
             )}
           </div>
 
-          <div className="overflow-x-auto -mx-4 sm:mx-0">
-            <div className="inline-block min-w-full align-middle">
-              <div className="overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Name</th>
-                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Email</th>
-                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Role</th>
-                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Details</th>
-                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Actions</th>
-                    </tr>
-                  </thead>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {getFilteredUsers().map((user) => (
                   <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {user.name}
                     </td>
-                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {user.email}
                     </td>
-                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
                         user.role === 'student' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
                       }`}>
                         {user.role}
                       </span>
                     </td>
-                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {user.role === 'student'
                         ? `${user.studentId} - ${user.grade}${user.section ? ` (${user.section})` : ''}`
                         : `${user.grade}${user.section ? ` (${user.section})` : ''}`}
                     </td>
-                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm space-x-2 sm:space-x-3">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm space-x-3">
                       <button
                         onClick={() => handleResetPassword(user.id, user.name)}
                         className="text-blue-600 hover:text-blue-800 font-semibold"
                       >
-                        Reset
+                        Reset Password
                       </button>
                       <button
                         onClick={() => handleDeleteUser(user.id, user.name)}
@@ -1452,31 +1485,31 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl p-4 sm:p-6 w-full max-w-md mx-4">
-            <div className="flex items-start gap-3 mb-4">
-              <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-red-100 rounded-full flex items-center justify-center">
-                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Confirm Deletion</h3>
-                <p className="text-xs sm:text-sm text-gray-600 mt-1">
-                  Are you sure you want to delete <span className="font-semibold break-words">{deleteConfirm.userName}</span>? This action cannot be undone.
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900">Confirm Deletion</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Are you sure you want to delete <span className="font-semibold">{deleteConfirm.userName}</span>? This action cannot be undone.
                 </p>
               </div>
             </div>
 
-            <div className="flex gap-2 sm:gap-3 mt-4 sm:mt-6">
+            <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-semibold text-sm sm:text-base min-h-[48px]"
+                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-semibold"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
-                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold text-sm sm:text-base min-h-[48px]"
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold"
               >
                 Delete User
               </button>
