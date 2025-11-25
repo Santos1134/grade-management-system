@@ -75,6 +75,8 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
   const [editMode, setEditMode] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [activeSubjectIndex, setActiveSubjectIndex] = useState(0);
+  const [showPeriodRankings, setShowPeriodRankings] = useState(false);
+  const [selectedPeriod, setSelectedPeriod] = useState<'period1' | 'period2' | 'period3' | 'exam1' | 'period4' | 'period5' | 'period6' | 'exam2' | 'sem1Avg' | 'sem2Avg'>('period1');
 
   const getSubjectsForGrade = () => {
     const isJunior = user.grade.includes('7th') || user.grade.includes('8th') || user.grade.includes('9th');
@@ -152,7 +154,11 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
     if (storedUsers) {
       const allUsers = JSON.parse(storedUsers);
       gradeStudents = allUsers.filter(
-        (u: any) => u.role === 'student' && u.grade === user.grade
+        (u: any) =>
+          u.role === 'student' &&
+          u.grade === user.grade &&
+          // Match section if sponsor has a section (for 7th and 8th grade)
+          (!user.section || u.section === user.section)
       );
     }
 
@@ -184,20 +190,71 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
     return (sum / 2).toFixed(2);
   };
 
-  const updateSubjectGrade = (subject: string, field: keyof SubjectGrade, value: string) => {
-    // Validate grade values (max 100)
-    if (field !== 'comments' && field !== 'subject' && value) {
-      const numValue = parseFloat(value);
-      if (numValue > 100) {
-        showNotification('Grade cannot exceed 100', 'error');
-        return;
-      }
-      if (numValue < 0) {
-        showNotification('Grade cannot be negative', 'error');
-        return;
-      }
-    }
+  const getGradeColorClass = (grade: string | number | undefined) => {
+    if (!grade) return '';
+    const numGrade = typeof grade === 'string' ? parseFloat(grade) : grade;
+    if (isNaN(numGrade)) return '';
+    if (numGrade >= 70) return 'text-blue-600 font-semibold';
+    if (numGrade >= 50) return 'text-red-600 font-semibold';
+    return '';
+  };
 
+  const calculatePeriodRankings = () => {
+    const storedGrades = localStorage.getItem('grades');
+    if (!storedGrades) return [];
+
+    const allGrades = JSON.parse(storedGrades);
+
+    // Calculate average for selected period for each student
+    const studentAverages = students.map(student => {
+      const studentGrades = allGrades.filter((g: any) => g.studentId === student.id);
+
+      let average = 0;
+      let values: number[] = [];
+
+      if (selectedPeriod === 'sem1Avg') {
+        // Calculate Semester 1 Average
+        studentGrades.forEach((g: any) => {
+          const sem1Avg = calculateSemesterAverage(g.period1, g.period2, g.period3, g.exam1);
+          if (sem1Avg) values.push(parseFloat(sem1Avg));
+        });
+      } else if (selectedPeriod === 'sem2Avg') {
+        // Calculate Semester 2 Average
+        studentGrades.forEach((g: any) => {
+          const sem2Avg = calculateSemesterAverage(g.period4, g.period5, g.period6, g.exam2);
+          if (sem2Avg) values.push(parseFloat(sem2Avg));
+        });
+      } else {
+        // Calculate for specific period
+        values = studentGrades
+          .map((g: any) => g[selectedPeriod])
+          .filter((val: any) => val !== undefined && !isNaN(val))
+          .map((val: any) => parseFloat(val));
+      }
+
+      average = values.length > 0
+        ? values.reduce((sum: number, val: number) => sum + val, 0) / values.length
+        : 0;
+
+      return {
+        studentId: student.id,
+        studentName: student.name,
+        grade: student.grade,
+        average: average,
+        hasGrades: values.length > 0
+      };
+    });
+
+    // Filter students with grades and sort by average
+    const rankedStudents = studentAverages
+      .filter(s => s.hasGrades)
+      .sort((a, b) => b.average - a.average);
+
+    return rankedStudents;
+  };
+
+  const updateSubjectGrade = (subject: string, field: keyof SubjectGrade, value: string) => {
+    // Allow free typing - update state immediately without validation
     setSubjectGrades(prev => ({
       ...prev,
       [subject]: {
@@ -205,6 +262,39 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
         [field]: value
       }
     }));
+  };
+
+  const validateGradeOnBlur = (subject: string, field: keyof SubjectGrade, value: string) => {
+    // Validate only when user finishes typing (on blur)
+    if (field !== 'comments' && field !== 'subject' && value) {
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue)) {
+        if (numValue > 100) {
+          showNotification('Grade cannot exceed 100', 'error');
+          // Reset to empty
+          setSubjectGrades(prev => ({
+            ...prev,
+            [subject]: {
+              ...prev[subject],
+              [field]: ''
+            }
+          }));
+          return;
+        }
+        if (numValue < 50) {
+          showNotification('Grade cannot be less than 50', 'error');
+          // Reset to empty
+          setSubjectGrades(prev => ({
+            ...prev,
+            [subject]: {
+              ...prev[subject],
+              [field]: ''
+            }
+          }));
+          return;
+        }
+      }
+    }
   };
 
   const hasAnyGradeData = (subjectGrade: SubjectGrade) => {
@@ -314,9 +404,14 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
   };
 
   const getClassGradesCount = () => {
-    // Only count grades for students in this sponsor's class
+    // Count the number of students who have at least one grade entry
     const classStudentIds = students.map(s => s.id);
-    return grades.filter(g => classStudentIds.includes(g.studentId)).length;
+    const studentsWithGrades = new Set(
+      grades
+        .filter(g => classStudentIds.includes(g.studentId))
+        .map(g => g.studentId)
+    );
+    return studentsWithGrades.size;
   };
 
   const calculateClassStatistics = () => {
@@ -366,7 +461,7 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
           <div>
             <h1 className="text-2xl font-bold text-white">Sponsor Dashboard</h1>
             <p className="text-sm text-green-100">
-              {user.name} - Grade {user.grade} Sponsor
+              {user.name} - {user.grade}{user.section ? ` Section ${user.section}` : ''} Sponsor
             </p>
           </div>
           <button
@@ -384,15 +479,17 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
         <div className="bg-white rounded-lg shadow p-6 mb-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <p className="text-sm text-gray-600">Assigned Grade</p>
-              <p className="text-2xl font-bold text-green-600">{user.grade}</p>
+              <p className="text-sm text-gray-600">Assigned Class</p>
+              <p className="text-2xl font-bold text-green-600">
+                {user.grade}{user.section ? ` (${user.section})` : ''}
+              </p>
             </div>
             <div>
               <p className="text-sm text-gray-600">Total Students</p>
               <p className="text-2xl font-bold text-gray-900">{students.length}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Class Grade Entries</p>
+              <p className="text-sm text-gray-600">Student Grade Entry</p>
               <p className="text-2xl font-bold text-gray-900">{getClassGradesCount()}</p>
             </div>
             <div>
@@ -411,7 +508,7 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
           <div className="bg-white rounded-lg shadow mb-8">
             <div className="px-6 py-4 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900">
-                Class Rankings - {user.grade}
+                Class Rankings - {user.grade}{user.section ? ` Section ${user.section}` : ''}
               </h2>
             </div>
             <div className="p-6">
@@ -449,11 +546,99 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
           </div>
         )}
 
+        {/* Period Rankings Section */}
+        <div className="bg-white rounded-lg shadow mb-8">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Period & Exam Rankings
+              </h2>
+              <button
+                onClick={() => setShowPeriodRankings(!showPeriodRankings)}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold"
+              >
+                {showPeriodRankings ? 'Hide' : 'Show'} Rankings
+              </button>
+            </div>
+          </div>
+
+          {showPeriodRankings && (
+            <div className="p-6">
+              <div className="mb-6 flex gap-4 items-center">
+                <label className="text-sm font-medium text-gray-700">Select Period:</label>
+                <select
+                  value={selectedPeriod}
+                  onChange={(e) => setSelectedPeriod(e.target.value as any)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                >
+                  <optgroup label="Semester 1">
+                    <option value="period1">1st Period</option>
+                    <option value="period2">2nd Period</option>
+                    <option value="period3">3rd Period</option>
+                    <option value="exam1">Exam 1</option>
+                    <option value="sem1Avg">Semester 1 Average</option>
+                  </optgroup>
+                  <optgroup label="Semester 2">
+                    <option value="period4">4th Period</option>
+                    <option value="period5">5th Period</option>
+                    <option value="period6">6th Period</option>
+                    <option value="exam2">Exam 2</option>
+                    <option value="sem2Avg">Semester 2 Average</option>
+                  </optgroup>
+                </select>
+              </div>
+
+              {calculatePeriodRankings().length > 0 ? (
+                <div>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Showing {calculatePeriodRankings().length} students with grades for selected period
+                  </p>
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student Name</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Average</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {calculatePeriodRankings().map((student, index) => (
+                        <tr key={student.studentId} className={index < 3 ? 'bg-yellow-50' : ''}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                            {index < 3 && (
+                              <span className="mr-2">
+                                {index === 0 && '🥇'}
+                                {index === 1 && '🥈'}
+                                {index === 2 && '🥉'}
+                              </span>
+                            )}
+                            #{index + 1}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {student.studentName}
+                          </td>
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${getGradeColorClass(student.average)}`}>
+                            {student.average.toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-center text-gray-500 py-8">
+                  No grades available yet for the selected period. Enter grades to see rankings.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Students List */}
         <div className="bg-white rounded-lg shadow mb-8">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">
-              Students in {user.grade}
+              Students in {user.grade}{user.section ? ` Section ${user.section}` : ''}
             </h2>
           </div>
 
@@ -505,7 +690,7 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                 {students.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                      No students assigned to {user.grade} yet
+                      No students assigned to {user.grade}{user.section ? ` Section ${user.section}` : ''} yet
                     </td>
                   </tr>
                 )}
@@ -597,35 +782,99 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
             return (sum / values.length).toFixed(2);
           };
 
+          // Calculate semester 1 average across all subjects
+          const calculateSemester1Average = () => {
+            const semester1Averages = subjects
+              .map(subject => {
+                const data = subjectGrades[subject];
+                if (!data) return null;
+                const sem1Avg = calculateSemesterAverage(data.period1, data.period2, data.period3, data.exam1);
+                return sem1Avg ? parseFloat(sem1Avg) : null;
+              })
+              .filter((val): val is number => val !== null && !isNaN(val));
+
+            if (semester1Averages.length === 0) return null;
+            const sum = semester1Averages.reduce((acc, val) => acc + val, 0);
+            return (sum / semester1Averages.length).toFixed(2);
+          };
+
+          // Calculate semester 2 average across all subjects
+          const calculateSemester2Average = () => {
+            const semester2Averages = subjects
+              .map(subject => {
+                const data = subjectGrades[subject];
+                if (!data) return null;
+                const sem2Avg = calculateSemesterAverage(data.period4, data.period5, data.period6, data.exam2);
+                return sem2Avg ? parseFloat(sem2Avg) : null;
+              })
+              .filter((val): val is number => val !== null && !isNaN(val));
+
+            if (semester2Averages.length === 0) return null;
+            const sum = semester2Averages.reduce((acc, val) => acc + val, 0);
+            return (sum / semester2Averages.length).toFixed(2);
+          };
+
+          // Calculate final average across all subjects
+          const calculateFinalAverageAcrossSubjects = () => {
+            const finalAverages = subjects
+              .map(subject => {
+                const data = subjectGrades[subject];
+                if (!data) return null;
+                const sem1Avg = calculateSemesterAverage(data.period1, data.period2, data.period3, data.exam1);
+                const sem2Avg = calculateSemesterAverage(data.period4, data.period5, data.period6, data.exam2);
+                const finalAvg = calculateFinalAverage(sem1Avg, sem2Avg);
+                return finalAvg ? parseFloat(finalAvg) : null;
+              })
+              .filter((val): val is number => val !== null && !isNaN(val));
+
+            if (finalAverages.length === 0) return null;
+            const sum = finalAverages.reduce((acc, val) => acc + val, 0);
+            return (sum / finalAverages.length).toFixed(2);
+          };
+
           return (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="bg-white rounded-lg shadow-xl w-full max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden">
                 {/* Header */}
-                <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">
-                      {editMode ? 'Edit' : 'Add'} Grades for {selectedStudent.name}
-                    </h3>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Subject {activeSubjectIndex + 1} of {subjects.length}
-                    </p>
+                <div className="px-6 py-4 border-b border-gray-200 bg-white flex-shrink-0">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-gray-900">
+                        {editMode ? 'Edit' : 'Add'} Grades for {selectedStudent.name}
+                      </h3>
+                      <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Grade:</span>
+                          <span className="px-2 py-1 bg-gray-100 rounded">{selectedStudent.grade}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Student ID:</span>
+                          <span className="px-2 py-1 bg-gray-100 rounded">{selectedStudent.studentId}</span>
+                        </div>
+                        <div className="flex items-center gap-3 ml-auto">
+                          <span className="text-xs">Grade Range: 50-100</span>
+                          <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">70-100 = Blue</span>
+                          <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold">50-69 = Red</span>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowAddGrade(false);
+                        setActiveSubjectIndex(0);
+                      }}
+                      className="ml-4 text-gray-500 hover:text-gray-700 flex-shrink-0"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      setShowAddGrade(false);
-                      setActiveSubjectIndex(0);
-                    }}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
                 </div>
 
                 {/* Period Averages Display */}
-                <div className="px-6 py-3 bg-gradient-to-r from-blue-50 to-purple-50 border-b border-gray-200">
-                  <p className="text-xs font-medium text-gray-600 mb-2">Student Period Averages (across all subjects)</p>
+                <div className="px-6 py-3 bg-gradient-to-r from-blue-50 to-purple-50 border-b border-gray-200 flex-shrink-0">
+                  <p className="text-xs font-medium text-gray-600 mb-2">Period Averages & Rankings (Across All Subjects)</p>
                   <div className="grid grid-cols-4 gap-3">
                     {/* Semester 1 Periods */}
                     <div className="flex items-center gap-2">
@@ -680,232 +929,215 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                       </span>
                     </div>
                   </div>
-                </div>
-
-                {/* Subject Tabs */}
-                <div className="px-6 py-3 border-b border-gray-200 bg-gray-50 overflow-x-auto">
-                  <div className="flex gap-2">
-                    {subjects.map((subject, index) => {
-                      const hasData = subjectGrades[subject] && hasAnyGradeData(subjectGrades[subject]);
-                      return (
-                        <button
-                          key={subject}
-                          onClick={() => setActiveSubjectIndex(index)}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition flex items-center gap-2 ${
-                            index === activeSubjectIndex
-                              ? 'bg-green-600 text-white'
-                              : hasData
-                              ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                              : 'bg-white text-gray-700 hover:bg-gray-100'
-                          }`}
-                        >
-                          {subject}
-                          {hasData && index !== activeSubjectIndex && (
-                            <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
-                          )}
-                        </button>
-                      );
-                    })}
+                  <div className="grid grid-cols-3 gap-4 mt-3 pt-3 border-t border-gray-300">
+                    {/* Semester and Final Averages */}
+                    <div className="flex items-center gap-2 bg-blue-100 px-3 py-2 rounded-lg">
+                      <span className="text-xs font-medium text-blue-800">Semester 1 Average:</span>
+                      <span className={`text-base font-bold ${getGradeColorClass(calculateSemester1Average()) || 'text-blue-900'}`}>
+                        {calculateSemester1Average() || '-'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-purple-100 px-3 py-2 rounded-lg">
+                      <span className="text-xs font-medium text-purple-800">Semester 2 Average:</span>
+                      <span className={`text-base font-bold ${getGradeColorClass(calculateSemester2Average()) || 'text-purple-900'}`}>
+                        {calculateSemester2Average() || '-'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 bg-green-100 px-3 py-2 rounded-lg">
+                      <span className="text-xs font-medium text-green-800">Final Average:</span>
+                      <span className={`text-base font-bold ${getGradeColorClass(calculateFinalAverageAcrossSubjects()) || 'text-green-900'}`}>
+                        {calculateFinalAverageAcrossSubjects() || '-'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Grade Entry Form */}
-                <div className="flex-1 overflow-y-auto px-6 py-6">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
-                    <p className="text-sm text-blue-800">
-                      <strong>Note:</strong> All fields are optional. Grades cannot exceed 100. Blue dots indicate subjects with entered data.
-                    </p>
+                {/* Grade Entry Table */}
+                <div className="flex-1 overflow-auto px-6 py-6">
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse min-w-[1200px]">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="border border-gray-300 px-4 py-3 text-left font-semibold text-gray-700 sticky left-0 bg-gray-100 z-10 min-w-[180px]">Subject</th>
+                        <th className="border border-gray-300 px-3 py-3 text-center font-semibold text-blue-700" colSpan={4}>Semester 1</th>
+                        <th className="border border-gray-300 px-3 py-3 text-center font-semibold text-blue-700">Sem1 Avg</th>
+                        <th className="border border-gray-300 px-3 py-3 text-center font-semibold text-purple-700" colSpan={4}>Semester 2</th>
+                        <th className="border border-gray-300 px-3 py-3 text-center font-semibold text-purple-700">Sem2 Avg</th>
+                        <th className="border border-gray-300 px-3 py-3 text-center font-semibold text-green-700">Final</th>
+                      </tr>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-300 px-4 py-2 text-left font-medium text-gray-600 text-sm sticky left-0 bg-gray-50 z-10"></th>
+                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm">1st</th>
+                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm">2nd</th>
+                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm">3rd</th>
+                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm">Exam</th>
+                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm"></th>
+                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm">4th</th>
+                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm">5th</th>
+                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm">6th</th>
+                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm">Exam</th>
+                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm"></th>
+                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {subjects.map((subject) => {
+                        const data = subjectGrades[subject] || {};
+                        const sem1Avg = calculateSemesterAverage(data.period1, data.period2, data.period3, data.exam1);
+                        const sem2Avg = calculateSemesterAverage(data.period4, data.period5, data.period6, data.exam2);
+                        const finalAvg = calculateFinalAverage(sem1Avg, sem2Avg);
+
+                        return (
+                          <tr key={subject} className="hover:bg-gray-50">
+                            <td className="border border-gray-300 px-4 py-2 font-medium text-gray-900 sticky left-0 bg-white">{subject}</td>
+                            <td className="border border-gray-300 px-2 py-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="50"
+                                max="100"
+                                value={data.period1 || ''}
+                                onChange={(e) => updateSubjectGrade(subject, 'period1', e.target.value)}
+                                onBlur={(e) => validateGradeOnBlur(subject, 'period1', e.target.value)}
+                                className={`w-full px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-sm ${getGradeColorClass(data.period1)}`}
+                                placeholder="-"
+                              />
+                            </td>
+                            <td className="border border-gray-300 px-2 py-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="50"
+                                max="100"
+                                value={data.period2 || ''}
+                                onChange={(e) => updateSubjectGrade(subject, 'period2', e.target.value)}
+                                onBlur={(e) => validateGradeOnBlur(subject, 'period2', e.target.value)}
+                                className={`w-full px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-sm ${getGradeColorClass(data.period2)}`}
+                                placeholder="-"
+                              />
+                            </td>
+                            <td className="border border-gray-300 px-2 py-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="50"
+                                max="100"
+                                value={data.period3 || ''}
+                                onChange={(e) => updateSubjectGrade(subject, 'period3', e.target.value)}
+                                onBlur={(e) => validateGradeOnBlur(subject, 'period3', e.target.value)}
+                                className={`w-full px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-sm ${getGradeColorClass(data.period3)}`}
+                                placeholder="-"
+                              />
+                            </td>
+                            <td className="border border-gray-300 px-2 py-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="50"
+                                max="100"
+                                value={data.exam1 || ''}
+                                onChange={(e) => updateSubjectGrade(subject, 'exam1', e.target.value)}
+                                onBlur={(e) => validateGradeOnBlur(subject, 'exam1', e.target.value)}
+                                className={`w-full px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-sm ${getGradeColorClass(data.exam1)}`}
+                                placeholder="-"
+                              />
+                            </td>
+                            <td className="border border-gray-300 px-3 py-2 text-center bg-blue-50">
+                              <span className={getGradeColorClass(sem1Avg) || 'font-semibold text-gray-600'}>
+                                {sem1Avg || '-'}
+                              </span>
+                            </td>
+                            <td className="border border-gray-300 px-2 py-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="50"
+                                max="100"
+                                value={data.period4 || ''}
+                                onChange={(e) => updateSubjectGrade(subject, 'period4', e.target.value)}
+                                onBlur={(e) => validateGradeOnBlur(subject, 'period4', e.target.value)}
+                                className={`w-full px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-sm ${getGradeColorClass(data.period4)}`}
+                                placeholder="-"
+                              />
+                            </td>
+                            <td className="border border-gray-300 px-2 py-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="50"
+                                max="100"
+                                value={data.period5 || ''}
+                                onChange={(e) => updateSubjectGrade(subject, 'period5', e.target.value)}
+                                onBlur={(e) => validateGradeOnBlur(subject, 'period5', e.target.value)}
+                                className={`w-full px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-sm ${getGradeColorClass(data.period5)}`}
+                                placeholder="-"
+                              />
+                            </td>
+                            <td className="border border-gray-300 px-2 py-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="50"
+                                max="100"
+                                value={data.period6 || ''}
+                                onChange={(e) => updateSubjectGrade(subject, 'period6', e.target.value)}
+                                onBlur={(e) => validateGradeOnBlur(subject, 'period6', e.target.value)}
+                                className={`w-full px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-sm ${getGradeColorClass(data.period6)}`}
+                                placeholder="-"
+                              />
+                            </td>
+                            <td className="border border-gray-300 px-2 py-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="50"
+                                max="100"
+                                value={data.exam2 || ''}
+                                onChange={(e) => updateSubjectGrade(subject, 'exam2', e.target.value)}
+                                onBlur={(e) => validateGradeOnBlur(subject, 'exam2', e.target.value)}
+                                className={`w-full px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-sm ${getGradeColorClass(data.exam2)}`}
+                                placeholder="-"
+                              />
+                            </td>
+                            <td className="border border-gray-300 px-3 py-2 text-center bg-purple-50">
+                              <span className={getGradeColorClass(sem2Avg) || 'font-semibold text-gray-600'}>
+                                {sem2Avg || '-'}
+                              </span>
+                            </td>
+                            <td className="border border-gray-300 px-3 py-2 text-center bg-green-50">
+                              <span className={getGradeColorClass(finalAvg) || 'font-bold text-gray-600'}>
+                                {finalAvg || '-'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                   </div>
 
-                  {subjectData && (() => {
-                    const sem1Avg = calculateSemesterAverage(
-                      subjectData.period1,
-                      subjectData.period2,
-                      subjectData.period3,
-                      subjectData.exam1
-                    );
-                    const sem2Avg = calculateSemesterAverage(
-                      subjectData.period4,
-                      subjectData.period5,
-                      subjectData.period6,
-                      subjectData.exam2
-                    );
-                    const finalAvg = calculateFinalAverage(sem1Avg, sem2Avg);
-
-                    return (
-                      <div className="space-y-6">
-                        {/* Current Subject Header */}
-                        <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-lg p-4">
-                          <h4 className="text-2xl font-bold text-green-800">{currentSubject}</h4>
-                        </div>
-
-                        {/* Semester 1 */}
-                        <div className="border border-gray-200 rounded-lg p-5">
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                              <div className="w-1 h-6 bg-blue-600 rounded"></div>
-                              <h5 className="text-lg font-semibold text-gray-900">Semester 1</h5>
-                            </div>
-                            {sem1Avg && (
-                              <div className="bg-blue-100 px-4 py-2 rounded-lg">
-                                <span className="text-sm font-medium text-blue-700">Semester Average: </span>
-                                <span className="text-lg font-bold text-blue-900">{sem1Avg}</span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="grid grid-cols-4 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">1st Period</label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={subjectData.period1}
-                                onChange={(e) => updateSubjectGrade(currentSubject, 'period1', e.target.value)}
-                                className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                                placeholder="0-100"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">2nd Period</label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={subjectData.period2}
-                                onChange={(e) => updateSubjectGrade(currentSubject, 'period2', e.target.value)}
-                                className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                                placeholder="0-100"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">3rd Period</label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={subjectData.period3}
-                                onChange={(e) => updateSubjectGrade(currentSubject, 'period3', e.target.value)}
-                                className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                                placeholder="0-100"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">Exam</label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={subjectData.exam1}
-                                onChange={(e) => updateSubjectGrade(currentSubject, 'exam1', e.target.value)}
-                                className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                                placeholder="0-100"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Semester 2 */}
-                        <div className="border border-gray-200 rounded-lg p-5">
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                              <div className="w-1 h-6 bg-purple-600 rounded"></div>
-                              <h5 className="text-lg font-semibold text-gray-900">Semester 2</h5>
-                            </div>
-                            {sem2Avg && (
-                              <div className="bg-purple-100 px-4 py-2 rounded-lg">
-                                <span className="text-sm font-medium text-purple-700">Semester Average: </span>
-                                <span className="text-lg font-bold text-purple-900">{sem2Avg}</span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="grid grid-cols-4 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">4th Period</label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={subjectData.period4}
-                                onChange={(e) => updateSubjectGrade(currentSubject, 'period4', e.target.value)}
-                                className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                                placeholder="0-100"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">5th Period</label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={subjectData.period5}
-                                onChange={(e) => updateSubjectGrade(currentSubject, 'period5', e.target.value)}
-                                className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                                placeholder="0-100"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">6th Period</label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={subjectData.period6}
-                                onChange={(e) => updateSubjectGrade(currentSubject, 'period6', e.target.value)}
-                                className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                                placeholder="0-100"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">Exam</label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={subjectData.exam2}
-                                onChange={(e) => updateSubjectGrade(currentSubject, 'exam2', e.target.value)}
-                                className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                                placeholder="0-100"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Final Average Display */}
-                        {finalAvg && (
-                          <div className="bg-gradient-to-r from-green-100 to-green-200 border-2 border-green-400 rounded-lg p-5">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <svg className="w-8 h-8 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <div>
-                                  <p className="text-sm font-medium text-green-700">Final Average for {currentSubject}</p>
-                                  <p className="text-xs text-green-600">Calculated from both semester averages</p>
-                                </div>
-                              </div>
-                              <div className="text-4xl font-bold text-green-800">{finalAvg}</div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Comments */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Comments (Optional)</label>
-                          <textarea
-                            value={subjectData.comments}
-                            onChange={(e) => updateSubjectGrade(currentSubject, 'comments', e.target.value)}
-                            rows={3}
-                            className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                            placeholder="Add any notes or comments about this subject..."
-                          />
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  {/* General Comments Section */}
+                  <div className="mt-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">General Comments (Optional)</label>
+                    <textarea
+                      value={subjectGrades[subjects[0]]?.comments || ''}
+                      onChange={(e) => updateSubjectGrade(subjects[0], 'comments', e.target.value)}
+                      rows={3}
+                      className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                      placeholder="Add any general notes or comments..."
+                    />
+                  </div>
                 </div>
 
-                {/* Footer Navigation */}
-                <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-                  <div className="flex gap-3">
+                {/* Footer */}
+                <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+
+                  <div className="flex gap-3 justify-between">
                     <button
                       type="button"
                       onClick={() => {
                         setShowAddGrade(false);
                         setSelectedStudent(null);
-                        setActiveSubjectIndex(0);
                       }}
                       className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition"
                     >
@@ -914,41 +1146,14 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
 
                     <button
                       type="button"
-                      onClick={() => setActiveSubjectIndex(Math.max(0, activeSubjectIndex - 1))}
-                      disabled={activeSubjectIndex === 0}
-                      className="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      onClick={handleSaveAllGrades}
+                      className="px-8 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition flex items-center gap-2"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      Previous
+                      {editMode ? 'Update All Grades' : 'Save All Grades'}
                     </button>
-
-                    <div className="flex-1"></div>
-
-                    {activeSubjectIndex < subjects.length - 1 ? (
-                      <button
-                        type="button"
-                        onClick={() => setActiveSubjectIndex(Math.min(subjects.length - 1, activeSubjectIndex + 1))}
-                        className="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition flex items-center gap-2"
-                      >
-                        Next Subject
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleSaveAllGrades}
-                        className="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition flex items-center gap-2"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        {editMode ? 'Update All Grades' : 'Save All Grades'}
-                      </button>
-                    )}
                   </div>
                 </div>
               </div>

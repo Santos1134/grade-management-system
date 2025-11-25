@@ -15,11 +15,13 @@ interface Student extends User {
   role: 'student';
   studentId: string;
   grade: string;
+  section?: string; // Optional section (A or B for 7th and 8th grade)
 }
 
 interface Sponsor extends User {
   role: 'sponsor';
   grade: string;
+  section?: string; // Optional section for sponsors of 7th and 8th grade
 }
 
 interface Admin extends User {
@@ -39,6 +41,7 @@ interface StoredUser {
   role: 'student' | 'sponsor';
   studentId?: string;
   grade?: string;
+  section?: string;
   assignedGrade?: string;
 }
 
@@ -52,7 +55,7 @@ function App() {
     if (!hasInitialized) {
       // Demo Users
       const demoUsers = [
-        // 10th Grade Students
+        // 7th Grade Section A Students
         {
           id: 'demo-s1',
           email: 'john.doe@school.com',
@@ -60,7 +63,8 @@ function App() {
           name: 'John Doe',
           role: 'student',
           studentId: 'STU0001',
-          grade: '10th Grade',
+          grade: '7th Grade',
+          section: 'A',
         },
         {
           id: 'demo-s2',
@@ -69,8 +73,10 @@ function App() {
           name: 'Jane Smith',
           role: 'student',
           studentId: 'STU0002',
-          grade: '10th Grade',
+          grade: '7th Grade',
+          section: 'A',
         },
+        // 7th Grade Section B Students
         {
           id: 'demo-s3',
           email: 'michael.brown@school.com',
@@ -78,7 +84,8 @@ function App() {
           name: 'Michael Brown',
           role: 'student',
           studentId: 'STU0003',
-          grade: '10th Grade',
+          grade: '7th Grade',
+          section: 'B',
         },
         {
           id: 'demo-s4',
@@ -87,8 +94,10 @@ function App() {
           name: 'Sarah Johnson',
           role: 'student',
           studentId: 'STU0004',
-          grade: '10th Grade',
+          grade: '7th Grade',
+          section: 'B',
         },
+        // 8th Grade Section A Students
         {
           id: 'demo-s5',
           email: 'david.williams@school.com',
@@ -96,9 +105,9 @@ function App() {
           name: 'David Williams',
           role: 'student',
           studentId: 'STU0005',
-          grade: '10th Grade',
+          grade: '8th Grade',
+          section: 'A',
         },
-        // 9th Grade Students
         {
           id: 'demo-s6',
           email: 'emily.davis@school.com',
@@ -106,8 +115,10 @@ function App() {
           name: 'Emily Davis',
           role: 'student',
           studentId: 'STU0006',
-          grade: '9th Grade',
+          grade: '8th Grade',
+          section: 'A',
         },
+        // 8th Grade Section B Students
         {
           id: 'demo-s7',
           email: 'james.wilson@school.com',
@@ -115,35 +126,93 @@ function App() {
           name: 'James Wilson',
           role: 'student',
           studentId: 'STU0007',
-          grade: '9th Grade',
+          grade: '8th Grade',
+          section: 'B',
+        },
+        {
+          id: 'demo-s8',
+          email: 'olivia.martinez@school.com',
+          password: 'password123',
+          name: 'Olivia Martinez',
+          role: 'student',
+          studentId: 'STU0008',
+          grade: '8th Grade',
+          section: 'B',
+        },
+        // 10th Grade Students (no sections)
+        {
+          id: 'demo-s9',
+          email: 'robert.johnson@school.com',
+          password: 'password123',
+          name: 'Robert Johnson',
+          role: 'student',
+          studentId: 'STU0009',
+          grade: '10th Grade',
+        },
+        {
+          id: 'demo-s10',
+          email: 'emma.garcia@school.com',
+          password: 'password123',
+          name: 'Emma Garcia',
+          role: 'student',
+          studentId: 'STU0010',
+          grade: '10th Grade',
         },
         // Sponsors
         {
           id: 'demo-sp1',
+          email: 'sponsor7a@school.com',
+          password: 'password123',
+          name: 'Mrs. Roberts',
+          role: 'sponsor',
+          grade: '7th Grade',
+          section: 'A',
+        },
+        {
+          id: 'demo-sp2',
+          email: 'sponsor7b@school.com',
+          password: 'password123',
+          name: 'Mr. Thompson',
+          role: 'sponsor',
+          grade: '7th Grade',
+          section: 'B',
+        },
+        {
+          id: 'demo-sp3',
+          email: 'sponsor8a@school.com',
+          password: 'password123',
+          name: 'Mrs. Anderson',
+          role: 'sponsor',
+          grade: '8th Grade',
+          section: 'A',
+        },
+        {
+          id: 'demo-sp4',
+          email: 'sponsor8b@school.com',
+          password: 'password123',
+          name: 'Mr. Davis',
+          role: 'sponsor',
+          grade: '8th Grade',
+          section: 'B',
+        },
+        {
+          id: 'demo-sp5',
           email: 'sponsor10@school.com',
           password: 'password123',
           name: 'Mrs. Johnson',
           role: 'sponsor',
           grade: '10th Grade',
         },
-        {
-          id: 'demo-sp2',
-          email: 'sponsor9@school.com',
-          password: 'password123',
-          name: 'Mr. Anderson',
-          role: 'sponsor',
-          grade: '9th Grade',
-        },
       ];
 
       // Demo Grades for 10th Grade Students
       const demoGrades = [
-        // John Doe - Mathematics
+        // 7th Grade Section A - John Doe
         {
           id: 'grade1',
           studentId: 'demo-s1',
           studentName: 'John Doe',
-          subject: 'Geometry',
+          subject: 'Mathematics',
           period1: 85,
           period2: 88,
           period3: 90,
@@ -173,29 +242,12 @@ function App() {
           sem2Av: 85.5,
           finalAverage: 83.38,
         },
+        // 7th Grade Section A - Jane Smith
         {
           id: 'grade3',
-          studentId: 'demo-s1',
-          studentName: 'John Doe',
-          subject: 'History',
-          period1: 90,
-          period2: 92,
-          period3: 88,
-          exam1: 91,
-          sem1Av: 90.25,
-          period4: 89,
-          period5: 93,
-          period6: 91,
-          exam2: 92,
-          sem2Av: 91.25,
-          finalAverage: 90.75,
-        },
-        // Jane Smith - Top Student
-        {
-          id: 'grade4',
           studentId: 'demo-s2',
           studentName: 'Jane Smith',
-          subject: 'Geometry',
+          subject: 'Mathematics',
           period1: 95,
           period2: 96,
           period3: 97,
@@ -209,7 +261,7 @@ function App() {
           finalAverage: 96.5,
         },
         {
-          id: 'grade5',
+          id: 'grade4',
           studentId: 'demo-s2',
           studentName: 'Jane Smith',
           subject: 'English',
@@ -225,29 +277,12 @@ function App() {
           sem2Av: 95.5,
           finalAverage: 94.5,
         },
+        // 7th Grade Section B - Michael Brown
         {
-          id: 'grade6',
-          studentId: 'demo-s2',
-          studentName: 'Jane Smith',
-          subject: 'History',
-          period1: 94,
-          period2: 95,
-          period3: 96,
-          exam1: 95,
-          sem1Av: 95,
-          period4: 96,
-          period5: 97,
-          period6: 98,
-          exam2: 97,
-          sem2Av: 97,
-          finalAverage: 96,
-        },
-        // Michael Brown
-        {
-          id: 'grade7',
+          id: 'grade5',
           studentId: 'demo-s3',
           studentName: 'Michael Brown',
-          subject: 'Geometry',
+          subject: 'Mathematics',
           period1: 75,
           period2: 78,
           period3: 80,
@@ -261,7 +296,7 @@ function App() {
           finalAverage: 79.5,
         },
         {
-          id: 'grade8',
+          id: 'grade6',
           studentId: 'demo-s3',
           studentName: 'Michael Brown',
           subject: 'English',
@@ -277,9 +312,9 @@ function App() {
           sem2Av: 84.75,
           finalAverage: 83.25,
         },
-        // Emily Davis - 9th Grade
+        // 8th Grade Section A - Emily Davis
         {
-          id: 'grade9',
+          id: 'grade7',
           studentId: 'demo-s6',
           studentName: 'Emily Davis',
           subject: 'Mathematics',
@@ -296,7 +331,7 @@ function App() {
           finalAverage: 91.13,
         },
         {
-          id: 'grade10',
+          id: 'grade8',
           studentId: 'demo-s6',
           studentName: 'Emily Davis',
           subject: 'English',
@@ -362,6 +397,7 @@ function App() {
           role: 'student',
           studentId: storedUser.studentId!,
           grade: storedUser.grade!,
+          section: storedUser.section,
         };
         setCurrentUser(student);
       } else {
@@ -371,6 +407,7 @@ function App() {
           name: storedUser.name,
           role: 'sponsor',
           grade: storedUser.grade || storedUser.assignedGrade!,
+          section: storedUser.section,
         };
         setCurrentUser(sponsor);
       }

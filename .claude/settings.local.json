@@ -15,7 +15,13 @@
       "Bash(git remote add:*)",
       "Bash(git branch:*)",
       "Bash(git push:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(git rm:*)",
+      "Bash(start https://santos1134.github.io/grade-management-system/)",
+      "Bash(start http://localhost:5173/)",
+      "Bash(npx tsc:*)",
+      "Bash(awk:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

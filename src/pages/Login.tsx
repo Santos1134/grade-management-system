@@ -15,6 +15,9 @@ export default function Login({ onLogin }: LoginProps) {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,12 +35,59 @@ export default function Login({ onLogin }: LoginProps) {
     setPassword('');
   };
 
+  const handleForgotPassword = () => {
+    if (!resetEmail) {
+      setNotification({ message: 'Please enter your email address', type: 'error' });
+      return;
+    }
+
+    const users = JSON.parse(localStorage.getItem('users') || '[]');
+    const user = users.find((u: any) => u.email === resetEmail && u.role === 'admin');
+
+    if (!user) {
+      setNotification({ message: 'No admin account found with this email', type: 'error' });
+      return;
+    }
+
+    // Generate a simple reset token (in production, this should be more secure)
+    const resetToken = Math.random().toString(36).substring(2, 15);
+    const resetTokens = JSON.parse(localStorage.getItem('resetTokens') || '[]');
+    resetTokens.push({
+      email: resetEmail,
+      token: resetToken,
+      timestamp: new Date().toISOString()
+    });
+    localStorage.setItem('resetTokens', JSON.stringify(resetTokens));
+
+    setNotification({
+      message: `Password reset link sent! Use token: ${resetToken}`,
+      type: 'success'
+    });
+
+    setTimeout(() => {
+      setShowForgotPassword(false);
+      setResetEmail('');
+    }, 3000);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative">
+      {/* Notification */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-lg ${
+          notification.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+        } text-white`}>
+          <div className="flex items-center gap-2">
+            <span>{notification.message}</span>
+            <button onClick={() => setNotification(null)} className="ml-2 font-bold">×</button>
+          </div>
+        </div>
+      )}
+
       {/* Background Image with Overlay */}
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: 'url(/stpeter.jpg)' }}
+        style={{ backgroundImage: `url(${import.meta.env.BASE_URL}stpeter.jpg)` }}
       >
         <div className="absolute inset-0 bg-green-900/70"></div>
       </div>
@@ -167,7 +217,56 @@ export default function Login({ onLogin }: LoginProps) {
                 Demo {userType}: {userType}@school.com / {userType === 'admin' ? 'admin123' : 'password123'}
               </p>
             </div>
+
+            {/* Forgot Password Link (Only for Admin) */}
+            {userType === 'admin' && (
+              <div className="text-center mt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-sm text-blue-600 hover:text-blue-800 underline"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+            )}
           </form>
+        )}
+
+        {/* Forgot Password Modal */}
+        {showForgotPassword && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Reset Admin Password</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Enter your admin email address to receive a password reset token.
+              </p>
+              <input
+                type="email"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                placeholder="admin@school.com"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none mb-4"
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowForgotPassword(false);
+                    setResetEmail('');
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleForgotPassword}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                >
+                  Send Reset Link
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

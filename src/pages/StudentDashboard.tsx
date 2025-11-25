@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Notification from '../components/Notification';
 
 interface User {
   id: string;
@@ -43,20 +44,52 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
   const [ranking, setRanking] = useState<{position: number, total: number} | null>(null);
   const [periodRankings, setPeriodRankings] = useState<{[key: string]: {position: number, total: number}}>({});
   const [sponsorName, setSponsorName] = useState<string>('Not Assigned');
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [gradeNotifications, setGradeNotifications] = useState<any[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
     loadGrades();
     calculateRanking();
     calculatePeriodRankings();
     getSponsorName();
+    checkForNewGrades();
   }, [user.id]);
+
+  const checkForNewGrades = () => {
+    // Check audit log for grade updates for this student
+    const changeLog = JSON.parse(localStorage.getItem('changeLog') || '[]');
+    const lastChecked = localStorage.getItem(`lastChecked_${user.id}`) || new Date(0).toISOString();
+
+    const newGradeUpdates = changeLog.filter((log: any) =>
+      (log.action === 'ADD_GRADES' || log.action === 'UPDATE_GRADES') &&
+      log.details.studentId === user.id &&
+      new Date(log.timestamp) > new Date(lastChecked)
+    );
+
+    if (newGradeUpdates.length > 0) {
+      setGradeNotifications(newGradeUpdates);
+      setNotification({
+        message: `You have ${newGradeUpdates.length} new grade update(s)! Click the bell icon to view.`,
+        type: 'info'
+      });
+    }
+  };
+
+  const markNotificationsAsRead = () => {
+    localStorage.setItem(`lastChecked_${user.id}`, new Date().toISOString());
+    setGradeNotifications([]);
+  };
 
   const getSponsorName = () => {
     const storedUsers = localStorage.getItem('users');
     if (!storedUsers) return;
     const users = JSON.parse(storedUsers);
     const sponsor = users.find((u: any) =>
-      u.role === 'sponsor' && u.grade === user.grade
+      u.role === 'sponsor' &&
+      u.grade === user.grade &&
+      // Match section if student has a section (for 7th and 8th grade)
+      (!user.section || u.section === user.section)
     );
     setSponsorName(sponsor ? sponsor.name : 'Not Assigned');
   };
@@ -79,7 +112,12 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
 
     const allGrades: Grade[] = JSON.parse(storedGrades);
     const allUsers = JSON.parse(storedUsers);
-    const studentsInGrade = allUsers.filter((u: any) => u.role === 'student' && u.grade === user.grade);
+    // Filter students by grade AND section (for 7th and 8th grade)
+    const studentsInGrade = allUsers.filter((u: any) =>
+      u.role === 'student' &&
+      u.grade === user.grade &&
+      (!user.section || u.section === user.section)
+    );
 
     // Calculate average for each student
     const studentAverages = studentsInGrade.map((student: any) => {
@@ -118,7 +156,12 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
 
     const allGrades: Grade[] = JSON.parse(storedGrades);
     const allUsers = JSON.parse(storedUsers);
-    const studentsInGrade = allUsers.filter((u: any) => u.role === 'student' && u.grade === user.grade);
+    // Filter students by grade AND section (for 7th and 8th grade)
+    const studentsInGrade = allUsers.filter((u: any) =>
+      u.role === 'student' &&
+      u.grade === user.grade &&
+      (!user.section || u.section === user.section)
+    );
 
     const periods = ['period1', 'period2', 'period3', 'exam1', 'period4', 'period5', 'period6', 'exam2'] as const;
     const rankings: {[key: string]: {position: number, total: number}} = {};
@@ -199,6 +242,14 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {notification && (
+        <Notification
+          message={notification.message}
+          type={notification.type}
+          onClose={() => setNotification(null)}
+        />
+      )}
+
       {/* Header */}
       <header className="bg-gradient-to-r from-green-600 to-green-800 shadow-lg print:bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
@@ -207,6 +258,25 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
             <p className="text-sm text-green-100 print:text-gray-600">Welcome, {user.name}</p>
           </div>
           <div className="flex gap-2 print:hidden">
+            {/* Notification Bell */}
+            <button
+              onClick={() => {
+                setShowNotifications(!showNotifications);
+                if (!showNotifications && gradeNotifications.length > 0) {
+                  markNotificationsAsRead();
+                }
+              }}
+              className="relative px-4 py-2 bg-white text-green-600 rounded-lg hover:bg-green-50 transition font-semibold flex items-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              {gradeNotifications.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {gradeNotifications.length}
+                </span>
+              )}
+            </button>
             <button
               onClick={handlePrint}
               className="px-4 py-2 bg-white text-green-600 rounded-lg hover:bg-green-50 transition font-semibold flex items-center gap-2"
@@ -247,7 +317,9 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
             </div>
             <div>
               <p className="text-sm text-gray-600">Grade Level</p>
-              <p className="text-2xl font-bold text-gray-900">{user.grade}</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {user.grade}{user.section ? ` (${user.section})` : ''}
+              </p>
             </div>
             <div>
               <p className="text-sm text-gray-600">Class Sponsor</p>
@@ -425,6 +497,64 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
           )}
         </div>
       </main>
+
+      {/* Notifications Modal */}
+      {showNotifications && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-xl font-bold text-gray-900">Grade Update Notifications</h3>
+              <button
+                onClick={() => setShowNotifications(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-6">
+              {gradeNotifications.length > 0 ? (
+                <div className="space-y-3">
+                  {gradeNotifications.map((notification, index) => (
+                    <div key={index} className="border border-green-200 bg-green-50 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-gray-900">
+                            {notification.action === 'ADD_GRADES' ? 'New grades added' : 'Grades updated'}
+                          </p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            <strong>By:</strong> {notification.user}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            <strong>Subjects:</strong> {notification.details.subjects?.join(', ')} ({notification.details.subjectCount} subjects)
+                          </p>
+                          <p className="text-xs text-gray-500 mt-2">
+                            {new Date(notification.timestamp).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  <p className="text-gray-500">No new notifications</p>
+                  <p className="text-sm text-gray-400 mt-1">You're all caught up!</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @media print {
