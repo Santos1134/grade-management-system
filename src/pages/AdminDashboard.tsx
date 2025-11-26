@@ -26,8 +26,8 @@ interface NewUserForm {
 }
 
 export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
-  const [showCreateUser, setShowCreateUser] = useState(false);
-  const [userType, setUserType] = useState<'student' | 'sponsor' | null>(null);
+  const [showCreateUser, setShowCreateUser] = useState(true);
+  const [userType, setUserType] = useState<'student' | 'sponsor' | null>('student');
   const [formData, setFormData] = useState<NewUserForm>({
     password: '',
     name: '',

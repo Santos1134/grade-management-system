@@ -39,6 +39,7 @@ interface LoginCredentials {
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [maintenanceMessage, setMaintenanceMessage] = useState<string | null>(null);
 
   // Check for existing session on mount
   useEffect(() => {
@@ -133,7 +134,7 @@ function App() {
           // Log out the student immediately
           await authService.signOut();
           setCurrentUser(null);
-          alert(maintenanceMode.message || 'Grades input is in progress. Please try again later.');
+          setMaintenanceMessage(maintenanceMode.message || 'Grades input is in progress. Please try again later.');
           return;
         }
       }
@@ -206,7 +207,7 @@ function App() {
 
   return (
     <>
-      <Login onLogin={handleLogin} />
+      <Login onLogin={handleLogin} maintenanceMessage={maintenanceMessage} />
       <Analytics />
     </>
   );
