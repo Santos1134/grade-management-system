@@ -16,7 +16,7 @@ export const auditService = {
       .single();
 
     const { error } = await supabase
-      .from('audit_logs')
+      .from('change_log')
       .insert({
         user_id: currentUser?.user?.id,
         user_name: profile?.name || 'Unknown',
@@ -30,7 +30,7 @@ export const auditService = {
   // Get all audit logs (admin only)
   async getAllLogs() {
     const { data, error } = await supabase
-      .from('audit_logs')
+      .from('change_log')
       .select('*')
       .order('timestamp', { ascending: false });
 
@@ -41,7 +41,7 @@ export const auditService = {
   // Get logs for a specific user
   async getUserLogs(userId: string) {
     const { data, error } = await supabase
-      .from('audit_logs')
+      .from('change_log')
       .select('*')
       .eq('user_id', userId)
       .order('timestamp', { ascending: false});
@@ -53,7 +53,7 @@ export const auditService = {
   // Get logs by action type
   async getLogsByAction(action: string) {
     const { data, error } = await supabase
-      .from('audit_logs')
+      .from('change_log')
       .select('*')
       .eq('action', action)
       .order('timestamp', { ascending: false});
@@ -93,7 +93,7 @@ export const auditService = {
       const lastChecked = await this.getLastChecked(userId);
 
       const { data, error } = await supabase
-        .from('audit_logs')
+        .from('change_log')
         .select('*')
         .in('action', ['ADD_GRADES', 'UPDATE_GRADES'])
         .contains('details', { studentId: userId })

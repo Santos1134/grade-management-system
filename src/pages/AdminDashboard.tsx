@@ -85,7 +85,14 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
   const loadAuditLogs = async () => {
     try {
       const logs = await auditService.getAllLogs();
-      setAuditLogs(logs); // Already sorted by timestamp DESC
+      console.log('Loaded audit logs:', logs);
+      console.log('Sample log details:', logs[0]?.details);
+      // Map database columns to expected format
+      const mappedLogs = logs.map(log => ({
+        ...log,
+        user: log.user_name, // Map user_name to user for display
+      }));
+      setAuditLogs(mappedLogs); // Already sorted by timestamp DESC
     } catch (error) {
       console.error('Error loading audit logs:', error);
       setAuditLogs([]);
