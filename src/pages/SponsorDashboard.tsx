@@ -222,8 +222,14 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
     if (!p1 || !p2 || !p3 || !exam) return '';
     const values = [p1, p2, p3, exam];
     if (values.some(v => isNaN(parseFloat(v)))) return '';
-    const sum = values.reduce((acc, val) => acc + parseFloat(val), 0);
-    return (sum / values.length).toFixed(2);
+
+    // Calculate average of periods 1-3
+    const periodAverage = (parseFloat(p1) + parseFloat(p2) + parseFloat(p3)) / 3;
+
+    // Add period average to exam and divide by 2
+    const semesterAverage = (periodAverage + parseFloat(exam)) / 2;
+
+    return semesterAverage.toFixed(2);
   };
 
   const calculateFinalAverage = (sem1: string, sem2: string) => {

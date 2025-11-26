@@ -75,7 +75,7 @@ CREATE TABLE public.grades (
   sem1_av NUMERIC(5,2) GENERATED ALWAYS AS (
     CASE
       WHEN period1 IS NOT NULL AND period2 IS NOT NULL AND period3 IS NOT NULL AND exam1 IS NOT NULL
-      THEN (period1 + period2 + period3 + exam1) / 4.0
+      THEN (((period1 + period2 + period3) / 3.0) + exam1) / 2.0
       ELSE NULL
     END
   ) STORED,
@@ -86,7 +86,7 @@ CREATE TABLE public.grades (
   sem2_av NUMERIC(5,2) GENERATED ALWAYS AS (
     CASE
       WHEN period4 IS NOT NULL AND period5 IS NOT NULL AND period6 IS NOT NULL AND exam2 IS NOT NULL
-      THEN (period4 + period5 + period6 + exam2) / 4.0
+      THEN (((period4 + period5 + period6) / 3.0) + exam2) / 2.0
       ELSE NULL
     END
   ) STORED,
@@ -94,7 +94,10 @@ CREATE TABLE public.grades (
     CASE
       WHEN period1 IS NOT NULL AND period2 IS NOT NULL AND period3 IS NOT NULL AND exam1 IS NOT NULL
            AND period4 IS NOT NULL AND period5 IS NOT NULL AND period6 IS NOT NULL AND exam2 IS NOT NULL
-      THEN ((period1 + period2 + period3 + exam1) / 4.0 + (period4 + period5 + period6 + exam2) / 4.0) / 2.0
+      THEN (
+        (((period1 + period2 + period3) / 3.0) + exam1) / 2.0 +
+        (((period4 + period5 + period6) / 3.0) + exam2) / 2.0
+      ) / 2.0
       ELSE NULL
     END
   ) STORED,
