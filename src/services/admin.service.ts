@@ -88,6 +88,12 @@ export const adminService = {
         });
       }
 
+      console.log('===== USER CREATED SUCCESSFULLY =====');
+      console.log('Email:', userData.email);
+      console.log('Password:', userData.password);
+      console.log('User ID:', userId);
+      console.log('====================================');
+
       return { success: true, userId };
     } catch (error) {
       // Note: Can't easily rollback auth user creation without service role
