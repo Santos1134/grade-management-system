@@ -13,6 +13,9 @@ export interface CreateUserData {
 export const adminService = {
   // Create a new user (student, sponsor, or admin)
   async createUser(userData: CreateUserData) {
+    // Save current admin session before creating new user
+    const { data: currentSession } = await supabase.auth.getSession();
+
     // Step 1: Create auth user using signUp
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: userData.email,
@@ -74,6 +77,15 @@ export const adminService = {
           });
 
         if (adminError) throw adminError;
+      }
+
+      // Step 4: Restore admin session after creating new user
+      // signUp() automatically logs in the new user, so we need to restore the admin's session
+      if (currentSession?.session) {
+        await supabase.auth.setSession({
+          access_token: currentSession.session.access_token,
+          refresh_token: currentSession.session.refresh_token,
+        });
       }
 
       return { success: true, userId };
