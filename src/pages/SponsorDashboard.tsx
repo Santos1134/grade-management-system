@@ -54,31 +54,31 @@ interface SponsorDashboardProps {
   onLogout: () => void;
 }
 
-const PERIODS = [
-  { key: 'period1', label: '1st Period' },
-  { key: 'period2', label: '2nd Period' },
-  { key: 'period3', label: '3rd Period' },
-  { key: 'exam1', label: 'Exam' },
-  { key: 'sem1Av', label: 'Sem Avg' },
-  { key: 'period4', label: '4th Period' },
-  { key: 'period5', label: '5th Period' },
-  { key: 'period6', label: '6th Period' },
-  { key: 'exam2', label: 'Exam' },
-  { key: 'sem2Av', label: 'Sem Avg' },
-  { key: 'finalAverage', label: 'Final Av' },
-];
+// const PERIODS = [
+//   { key: 'period1', label: '1st Period' },
+//   { key: 'period2', label: '2nd Period' },
+//   { key: 'period3', label: '3rd Period' },
+//   { key: 'exam1', label: 'Exam' },
+//   { key: 'sem1Av', label: 'Sem Avg' },
+//   { key: 'period4', label: '4th Period' },
+//   { key: 'period5', label: '5th Period' },
+//   { key: 'period6', label: '6th Period' },
+//   { key: 'exam2', label: 'Exam' },
+//   { key: 'sem2Av', label: 'Sem Avg' },
+//   { key: 'finalAverage', label: 'Final Av' },
+// ];
 
 export default function SponsorDashboard({ user, onLogout }: SponsorDashboardProps) {
   const [students, setStudents] = useState<any[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [showAddGrade, setShowAddGrade] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true);
   const [subjectGrades, setSubjectGrades] = useState<Record<string, SubjectGrade>>({});
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [showStats, setShowStats] = useState(false);
-  const [activeSubjectIndex, setActiveSubjectIndex] = useState(0);
+  const [, setActiveSubjectIndex] = useState(0);
   const [showPeriodRankings, setShowPeriodRankings] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<'period1' | 'period2' | 'period3' | 'exam1' | 'period4' | 'period5' | 'period6' | 'exam2' | 'sem1Avg' | 'sem2Avg'>('period1');
 
@@ -778,8 +778,6 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
         {/* Add Grades Modal */}
         {showAddGrade && selectedStudent && (() => {
           const subjects = getSubjectsForGrade();
-          const currentSubject = subjects[activeSubjectIndex];
-          const subjectData = subjectGrades[currentSubject];
 
           // Calculate period averages across all subjects
           const calculatePeriodAverage = (period: 'period1' | 'period2' | 'period3' | 'exam1' | 'period4' | 'period5' | 'period6' | 'exam2') => {

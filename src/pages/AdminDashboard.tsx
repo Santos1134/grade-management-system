@@ -42,7 +42,6 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
   const [passwordError, setPasswordError] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ userId: string; userName: string } | null>(null);
   const [filterGrade, setFilterGrade] = useState<string>('all');
-  const [filterRole, setFilterRole] = useState<string>('all');
   const [showPeriodRankings, setShowPeriodRankings] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<'period1' | 'period2' | 'period3' | 'exam1' | 'period4' | 'period5' | 'period6' | 'exam2' | 'sem1Avg' | 'sem2Avg' | 'finalAvg'>('period1');
   const [selectedGradeForRanking, setSelectedGradeForRanking] = useState<string>('all');
@@ -198,7 +197,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     }
   };
 
-  const handleResetPassword = async (userId: string, userName: string) => {
+  const handleResetPassword = async (_userId: string, _userName: string) => {
     showNotification(
       'Password reset requires service role access. Please reset passwords through Supabase Dashboard: Authentication > Users',
       'error'

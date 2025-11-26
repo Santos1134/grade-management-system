@@ -87,7 +87,7 @@ export const authService = {
   },
 
   // Admin: Create new user (requires admin privileges)
-  async createUser(userData: SignUpData) {
+  async createUser(_userData: SignUpData) {
     // This would be called from an admin function
     // For now, we'll use the service role key in a server function
     // or Edge Function to create users with specific roles

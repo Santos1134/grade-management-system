@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { supabase } from './lib/supabase';
 import { authService } from './services/auth.service';
 import Login from './pages/Login';
 import StudentDashboard from './pages/StudentDashboard';
@@ -117,7 +116,7 @@ function App() {
   const handleLogin = async (credentials: LoginCredentials) => {
     try {
       setLoading(true);
-      const { user, profile } = await authService.signIn(credentials);
+      await authService.signIn(credentials);
 
       // Load user profile after successful login
       await loadUserProfile();

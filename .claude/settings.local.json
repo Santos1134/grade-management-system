@@ -25,7 +25,9 @@
       "Bash(explorer c:Userssumomgrade-management-frontendsupabase)",
       "Bash(curl:*)",
       "Bash(timeout /t 5)",
-      "Bash(start http://localhost:5174/)"
+      "Bash(start http://localhost:5174/)",
+      "Bash(start http://localhost:5174/grade-management-system/)",
+      "Bash(start http://localhost:5173/grade-management-system/)"
     ],
     "deny": [],
     "ask": []
