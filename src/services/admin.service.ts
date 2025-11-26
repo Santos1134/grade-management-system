@@ -80,16 +80,21 @@ export const adminService = {
       }
 
       // Step 4: Restore admin session after creating new user
-      // signUp() automatically logs in the new user, so we need to:
-      // 1. Sign out the newly created user first
-      // 2. Then restore the admin's session
-      await supabase.auth.signOut();
-
+      // signUp() automatically logs in the new user, so we need to restore the admin's session
+      // We do this synchronously to prevent the auth state change from triggering
       if (currentSession?.session) {
-        await supabase.auth.setSession({
+        // Immediately restore the admin session without signing out first
+        // This prevents the brief logout that triggers the redirect to login page
+        const { error: sessionError } = await supabase.auth.setSession({
           access_token: currentSession.session.access_token,
           refresh_token: currentSession.session.refresh_token,
         });
+
+        if (sessionError) {
+          console.error('Error restoring admin session:', sessionError);
+          // Force a refresh of the session
+          await supabase.auth.refreshSession();
+        }
       }
 
       console.log('===== USER CREATED SUCCESSFULLY =====');
