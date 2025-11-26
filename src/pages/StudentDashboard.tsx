@@ -283,8 +283,9 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
             <button
               onClick={() => {
                 setShowNotifications(!showNotifications);
-                if (!showNotifications && gradeNotifications.length > 0) {
-                  markNotificationsAsRead();
+                // Dismiss the top notification banner when opening modal
+                if (!showNotifications) {
+                  setNotification(null);
                 }
               }}
               className="relative p-2 sm:px-3 sm:py-2 bg-white text-green-600 rounded-lg hover:bg-green-50 transition font-semibold flex items-center gap-1 sm:gap-2 min-h-[44px] min-w-[44px]"
@@ -544,7 +545,13 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <h3 className="text-xl font-bold text-gray-900">Grade Update Notifications</h3>
               <button
-                onClick={() => setShowNotifications(false)}
+                onClick={() => {
+                  setShowNotifications(false);
+                  // Mark notifications as read when closing the modal
+                  if (gradeNotifications.length > 0) {
+                    markNotificationsAsRead();
+                  }
+                }}
                 className="text-gray-500 hover:text-gray-700"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
