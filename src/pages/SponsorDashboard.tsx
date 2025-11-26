@@ -97,9 +97,19 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
   };
 
   useEffect(() => {
-    loadStudents();
-    loadGrades();
+    const loadData = async () => {
+      await loadStudents();
+      // loadGrades will be called after students are loaded
+    };
+    loadData();
   }, [user.grade]);
+
+  useEffect(() => {
+    // Load grades whenever students change
+    if (students.length > 0) {
+      loadGrades();
+    }
+  }, [students]);
 
   useEffect(() => {
     // Initialize subject grades when student is selected
@@ -174,6 +184,7 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
 
   const loadGrades = async () => {
     try {
+      // Get student IDs from the current students state
       const studentIds = students.map(s => s.id);
       if (studentIds.length > 0) {
         const data = await gradeService.getGradesForStudents(studentIds);
@@ -196,9 +207,13 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
           comments: g.comments
         }));
         setGrades(formattedGrades);
+      } else {
+        // If no students yet, set empty grades
+        setGrades([]);
       }
     } catch (error) {
       console.error('Error loading grades:', error);
+      setGrades([]);
     }
   };
 
