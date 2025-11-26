@@ -35,7 +35,10 @@
       "Bash(vercel env add:*)",
       "Bash(start https://vercel.com/santos1134s-projects/grade-management-frontend/settings/environment-variables)",
       "Bash(start https://grade-management-frontend-f30721j05-santos1134s-projects.vercel.app)",
-      "Bash(start https://grade-management-frontend-c7cn35s2h-santos1134s-projects.vercel.app)"
+      "Bash(start https://grade-management-frontend-c7cn35s2h-santos1134s-projects.vercel.app)",
+      "Bash(start https://grade-management-frontend-dsh9tg34e-santos1134s-projects.vercel.app)",
+      "Bash(start https://grade-management-frontend-3vnj7gu64-santos1134s-projects.vercel.app)",
+      "Bash(npm i:*)"
     ],
     "deny": [],
     "ask": []

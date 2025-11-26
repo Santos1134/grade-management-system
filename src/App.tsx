@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { authService } from './services/auth.service';
 import Login from './pages/Login';
 import StudentDashboard from './pages/StudentDashboard';
@@ -149,29 +150,52 @@ function App() {
   // Show loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+      <>
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading...</p>
+          </div>
         </div>
-      </div>
+        <Analytics />
+      </>
     );
   }
 
   // Render based on current user state
   if (currentUser) {
     if (currentUser.role === 'student') {
-      return <StudentDashboard user={currentUser as Student} onLogout={handleLogout} />;
+      return (
+        <>
+          <StudentDashboard user={currentUser as Student} onLogout={handleLogout} />
+          <Analytics />
+        </>
+      );
     }
     if (currentUser.role === 'sponsor') {
-      return <SponsorDashboard user={currentUser as Sponsor} onLogout={handleLogout} />;
+      return (
+        <>
+          <SponsorDashboard user={currentUser as Sponsor} onLogout={handleLogout} />
+          <Analytics />
+        </>
+      );
     }
     if (currentUser.role === 'admin') {
-      return <AdminDashboard user={currentUser as Admin} onLogout={handleLogout} />;
+      return (
+        <>
+          <AdminDashboard user={currentUser as Admin} onLogout={handleLogout} />
+          <Analytics />
+        </>
+      );
     }
   }
 
-  return <Login onLogin={handleLogin} />;
+  return (
+    <>
+      <Login onLogin={handleLogin} />
+      <Analytics />
+    </>
+  );
 }
 
 export default App;
