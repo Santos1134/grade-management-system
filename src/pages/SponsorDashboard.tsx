@@ -753,17 +753,17 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                   {getStudentGrades(selectedStudent.id).map((grade) => (
                     <tr key={grade.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 font-medium text-gray-900">{grade.subject}</td>
-                      <td className="px-4 py-3 text-gray-600">{grade.period1 || '-'}</td>
-                      <td className="px-4 py-3 text-gray-600">{grade.period2 || '-'}</td>
-                      <td className="px-4 py-3 text-gray-600">{grade.period3 || '-'}</td>
-                      <td className="px-4 py-3 text-gray-600">{grade.exam1 || '-'}</td>
-                      <td className="px-4 py-3 font-semibold text-blue-600">{grade.sem1Av || '-'}</td>
-                      <td className="px-4 py-3 text-gray-600">{grade.period4 || '-'}</td>
-                      <td className="px-4 py-3 text-gray-600">{grade.period5 || '-'}</td>
-                      <td className="px-4 py-3 text-gray-600">{grade.period6 || '-'}</td>
-                      <td className="px-4 py-3 text-gray-600">{grade.exam2 || '-'}</td>
-                      <td className="px-4 py-3 font-semibold text-blue-600">{grade.sem2Av || '-'}</td>
-                      <td className="px-4 py-3 font-bold text-green-600">{grade.finalAverage || '-'}</td>
+                      <td className={`px-4 py-3 ${getGradeColorClass(grade.period1)}`}>{grade.period1 || '-'}</td>
+                      <td className={`px-4 py-3 ${getGradeColorClass(grade.period2)}`}>{grade.period2 || '-'}</td>
+                      <td className={`px-4 py-3 ${getGradeColorClass(grade.period3)}`}>{grade.period3 || '-'}</td>
+                      <td className={`px-4 py-3 ${getGradeColorClass(grade.exam1)}`}>{grade.exam1 || '-'}</td>
+                      <td className={`px-4 py-3 ${getGradeColorClass(grade.sem1Av)}`}>{grade.sem1Av || '-'}</td>
+                      <td className={`px-4 py-3 ${getGradeColorClass(grade.period4)}`}>{grade.period4 || '-'}</td>
+                      <td className={`px-4 py-3 ${getGradeColorClass(grade.period5)}`}>{grade.period5 || '-'}</td>
+                      <td className={`px-4 py-3 ${getGradeColorClass(grade.period6)}`}>{grade.period6 || '-'}</td>
+                      <td className={`px-4 py-3 ${getGradeColorClass(grade.exam2)}`}>{grade.exam2 || '-'}</td>
+                      <td className={`px-4 py-3 ${getGradeColorClass(grade.sem2Av)}`}>{grade.sem2Av || '-'}</td>
+                      <td className={`px-4 py-3 ${getGradeColorClass(grade.finalAverage)}`}>{grade.finalAverage || '-'}</td>
                     </tr>
                   ))}
                   {getStudentGrades(selectedStudent.id).length === 0 && (

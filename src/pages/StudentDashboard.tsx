@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Notification from '../components/Notification';
 import { gradeService } from '../services/grade.service';
 import { userService } from '../services/user.service';
-import { auditService } from '../services/audit.service';
+import { notificationService } from '../services/notification.service';
 
 interface User {
   id: string;
@@ -70,13 +70,14 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
 
   const checkForNewGrades = async () => {
     try {
-      // Check Supabase audit log for grade updates for this student
-      const newGradeUpdates = await auditService.getGradeNotifications(user.id);
+      // Check notifications table for unread notifications
+      const notifications = await notificationService.getNotifications(user.id);
+      const unreadNotifications = notifications.filter((n: any) => !n.read);
 
-      if (newGradeUpdates.length > 0) {
-        setGradeNotifications(newGradeUpdates);
+      if (unreadNotifications.length > 0) {
+        setGradeNotifications(unreadNotifications);
         setNotification({
-          message: `You have ${newGradeUpdates.length} new grade update(s)! Click the bell icon to view.`,
+          message: `You have ${unreadNotifications.length} new grade notification(s)! Click the bell icon to view.`,
           type: 'info'
         });
       }
@@ -87,7 +88,7 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
 
   const markNotificationsAsRead = async () => {
     try {
-      await auditService.updateLastChecked(user.id);
+      await notificationService.markAllAsRead(user.id);
       setGradeNotifications([]);
     } catch (error) {
       console.error('Error marking notifications as read:', error);
@@ -235,6 +236,16 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
     return (sum / values.length).toFixed(2);
   };
 
+  const calculateSemesterAverage = (semester: 1 | 2) => {
+    const values = grades
+      .map(grade => semester === 1 ? grade.sem1Av : grade.sem2Av)
+      .filter((val): val is number => val !== undefined && !isNaN(val));
+
+    if (values.length === 0) return null;
+    const sum = values.reduce((acc, val) => acc + val, 0);
+    return (sum / values.length).toFixed(2);
+  };
+
   const handlePrint = () => {
     const originalTitle = document.title;
     document.title = `${user.name.replace(/\s+/g, '_')}_Grade_Report`;
@@ -358,7 +369,7 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
         {grades.length > 0 && (
           <div className="bg-white rounded-lg shadow p-4 sm:p-6 mb-4 sm:mb-6">
             <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Period Averages & Rankings</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
               {/* Semester 1 Periods */}
               <div className="bg-blue-50 rounded-lg p-4">
                 <p className="text-xs font-medium text-blue-700 mb-1">1st Period</p>
@@ -403,6 +414,12 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
                     Rank: {periodRankings['exam1'].position}/{periodRankings['exam1'].total}
                   </p>
                 )}
+              </div>
+              <div className="bg-blue-200 rounded-lg p-4">
+                <p className="text-xs font-medium text-blue-900 mb-1">Sem 1 Avg</p>
+                <p className="text-2xl font-bold text-blue-900">
+                  {calculateSemesterAverage(1) || '-'}
+                </p>
               </div>
 
               {/* Semester 2 Periods */}
@@ -449,6 +466,12 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
                     Rank: {periodRankings['exam2'].position}/{periodRankings['exam2'].total}
                   </p>
                 )}
+              </div>
+              <div className="bg-purple-200 rounded-lg p-4">
+                <p className="text-xs font-medium text-purple-900 mb-1">Sem 2 Avg</p>
+                <p className="text-2xl font-bold text-purple-900">
+                  {calculateSemesterAverage(2) || '-'}
+                </p>
               </div>
             </div>
           </div>
@@ -532,8 +555,8 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
             <div className="flex-1 overflow-auto p-6">
               {gradeNotifications.length > 0 ? (
                 <div className="space-y-3">
-                  {gradeNotifications.map((notification, index) => (
-                    <div key={index} className="border border-green-200 bg-green-50 rounded-lg p-4">
+                  {gradeNotifications.map((notification: any) => (
+                    <div key={notification.id} className="border border-green-200 bg-green-50 rounded-lg p-4">
                       <div className="flex items-start gap-3">
                         <div className="flex-shrink-0 w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
                           <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -542,16 +565,10 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
                         </div>
                         <div className="flex-1">
                           <p className="text-sm font-semibold text-gray-900">
-                            {notification.action === 'ADD_GRADES' ? 'New grades added' : 'Grades updated'}
-                          </p>
-                          <p className="text-sm text-gray-600 mt-1">
-                            <strong>By:</strong> {notification.user_name}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            <strong>Subjects:</strong> {notification.details?.subjects?.join(', ')} ({notification.details?.subjectCount} subjects)
+                            {notification.message}
                           </p>
                           <p className="text-xs text-gray-500 mt-2">
-                            {new Date(notification.timestamp).toLocaleString()}
+                            {new Date(notification.created_at).toLocaleString()}
                           </p>
                         </div>
                       </div>
