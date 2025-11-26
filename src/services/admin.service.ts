@@ -80,7 +80,11 @@ export const adminService = {
       }
 
       // Step 4: Restore admin session after creating new user
-      // signUp() automatically logs in the new user, so we need to restore the admin's session
+      // signUp() automatically logs in the new user, so we need to:
+      // 1. Sign out the newly created user first
+      // 2. Then restore the admin's session
+      await supabase.auth.signOut();
+
       if (currentSession?.session) {
         await supabase.auth.setSession({
           access_token: currentSession.session.access_token,
