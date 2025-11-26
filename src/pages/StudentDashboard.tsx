@@ -221,7 +221,7 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
       .map(g => g.finalAverage)
       .filter((avg): avg is number => avg !== undefined);
 
-    if (validAverages.length === 0) return '0.00';
+    if (validAverages.length === 0) return null;
     const sum = validAverages.reduce((acc, avg) => acc + avg, 0);
     return (sum / validAverages.length).toFixed(2);
   };
@@ -349,7 +349,7 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
               <p className="text-xs sm:text-sm text-gray-600">Class Sponsor</p>
               <p className="text-base sm:text-lg md:text-2xl font-bold text-gray-900 truncate">{sponsorName}</p>
             </div>
-            {ranking && ranking.position > 0 && calculateOverallAverage() !== '0.00' && (
+            {ranking && ranking.position > 0 && calculateOverallAverage() && (
               <div>
                 <p className="text-xs sm:text-sm text-gray-600">Class Ranking</p>
                 <p className="text-base sm:text-lg md:text-2xl font-bold text-green-600">
@@ -361,7 +361,7 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
           <div className="mt-4 pt-4 border-t border-gray-200">
             <div className="flex justify-between items-center">
               <p className="text-sm text-gray-600">Overall Average</p>
-              <p className="text-3xl font-bold text-green-600">{calculateOverallAverage()}</p>
+              <p className="text-3xl font-bold text-green-600">{calculateOverallAverage() || '-'}</p>
             </div>
           </div>
         </div>
