@@ -27,7 +27,15 @@
       "Bash(timeout /t 5)",
       "Bash(start http://localhost:5174/)",
       "Bash(start http://localhost:5174/grade-management-system/)",
-      "Bash(start http://localhost:5173/grade-management-system/)"
+      "Bash(start http://localhost:5173/grade-management-system/)",
+      "Bash(vercel --prod:*)",
+      "Bash(vercel login:*)",
+      "Bash(start https://vercel.com/oauth/device?user_code=WQKV-HQDP)",
+      "Bash(start https://grade-management-frontend-jk7x21fx4-santos1134s-projects.vercel.app)",
+      "Bash(vercel env add:*)",
+      "Bash(start https://vercel.com/santos1134s-projects/grade-management-frontend/settings/environment-variables)",
+      "Bash(start https://grade-management-frontend-f30721j05-santos1134s-projects.vercel.app)",
+      "Bash(start https://grade-management-frontend-c7cn35s2h-santos1134s-projects.vercel.app)"
     ],
     "deny": [],
     "ask": []

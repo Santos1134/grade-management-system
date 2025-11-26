@@ -120,9 +120,24 @@ function App() {
 
       // Load user profile after successful login
       await loadUserProfile();
+
+      // If we get here but currentUser is still null, there was a role mismatch
+      if (!currentUser) {
+        alert('Login successful, but your account role does not match. Please contact your administrator.');
+        await authService.signOut();
+      }
     } catch (error: any) {
       console.error('Login error:', error);
-      alert(error.message || 'Login failed! Please check your credentials.');
+      const errorMessage = error.message || 'Login failed! Please check your credentials.';
+
+      // Add specific messages for common errors
+      if (errorMessage.includes('Invalid login credentials')) {
+        alert('Invalid email or password. Please try again.');
+      } else if (errorMessage.includes('Email not confirmed')) {
+        alert('Your email is not confirmed. Please contact your administrator.');
+      } else {
+        alert(errorMessage);
+      }
     } finally {
       setLoading(false);
     }

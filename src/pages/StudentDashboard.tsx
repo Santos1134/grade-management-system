@@ -60,6 +60,14 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
     checkForNewGrades();
   }, [user.id]);
 
+  // Helper function to get grade color class based on value
+  const getGradeColorClass = (grade: number | undefined) => {
+    if (!grade) return 'text-gray-600';
+    if (grade >= 70) return 'text-blue-600 font-semibold';
+    if (grade >= 50) return 'text-red-600 font-semibold';
+    return 'text-gray-600';
+  };
+
   const checkForNewGrades = async () => {
     try {
       // Check Supabase audit log for grade updates for this student
@@ -483,17 +491,17 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
                     return (
                       <tr key={subject} className="hover:bg-gray-50">
                         <td className="px-2 sm:px-4 py-2 sm:py-3 font-medium text-gray-900 sticky left-0 bg-white whitespace-nowrap">{subject}</td>
-                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-600 whitespace-nowrap">{grade?.period1 || '-'}</td>
-                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-600 whitespace-nowrap">{grade?.period2 || '-'}</td>
-                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-600 whitespace-nowrap">{grade?.period3 || '-'}</td>
-                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-600 whitespace-nowrap">{grade?.exam1 || '-'}</td>
-                        <td className="px-2 sm:px-4 py-2 sm:py-3 font-semibold text-blue-600 whitespace-nowrap">{grade?.sem1Av?.toFixed(2) || '-'}</td>
-                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-600 whitespace-nowrap">{grade?.period4 || '-'}</td>
-                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-600 whitespace-nowrap">{grade?.period5 || '-'}</td>
-                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-600 whitespace-nowrap">{grade?.period6 || '-'}</td>
-                        <td className="px-2 sm:px-4 py-2 sm:py-3 text-gray-600 whitespace-nowrap">{grade?.exam2 || '-'}</td>
-                        <td className="px-2 sm:px-4 py-2 sm:py-3 font-semibold text-blue-600 whitespace-nowrap">{grade?.sem2Av?.toFixed(2) || '-'}</td>
-                        <td className="px-2 sm:px-4 py-2 sm:py-3 font-bold text-green-600 whitespace-nowrap">{grade?.finalAverage?.toFixed(2) || '-'}</td>
+                        <td className={`px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap ${getGradeColorClass(grade?.period1)}`}>{grade?.period1 || '-'}</td>
+                        <td className={`px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap ${getGradeColorClass(grade?.period2)}`}>{grade?.period2 || '-'}</td>
+                        <td className={`px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap ${getGradeColorClass(grade?.period3)}`}>{grade?.period3 || '-'}</td>
+                        <td className={`px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap ${getGradeColorClass(grade?.exam1)}`}>{grade?.exam1 || '-'}</td>
+                        <td className={`px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap ${getGradeColorClass(grade?.sem1Av)}`}>{grade?.sem1Av?.toFixed(2) || '-'}</td>
+                        <td className={`px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap ${getGradeColorClass(grade?.period4)}`}>{grade?.period4 || '-'}</td>
+                        <td className={`px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap ${getGradeColorClass(grade?.period5)}`}>{grade?.period5 || '-'}</td>
+                        <td className={`px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap ${getGradeColorClass(grade?.period6)}`}>{grade?.period6 || '-'}</td>
+                        <td className={`px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap ${getGradeColorClass(grade?.exam2)}`}>{grade?.exam2 || '-'}</td>
+                        <td className={`px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap ${getGradeColorClass(grade?.sem2Av)}`}>{grade?.sem2Av?.toFixed(2) || '-'}</td>
+                        <td className={`px-2 sm:px-4 py-2 sm:py-3 font-bold whitespace-nowrap ${getGradeColorClass(grade?.finalAverage)}`}>{grade?.finalAverage?.toFixed(2) || '-'}</td>
                       </tr>
                     );
                   })}
