@@ -71,9 +71,8 @@ export default function Login({ onLogin, maintenanceMessage }: LoginProps) {
 
       {/* Maintenance Mode Modal */}
       {maintenanceMessage && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 z-50 overflow-y-auto">
-          <div className="min-h-screen flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-2xl p-4 sm:p-6 md:p-8 w-full max-w-md my-8">
+        <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-2xl p-4 sm:p-6 md:p-8 w-full max-w-md relative">
               <div className="text-center">
                 {/* Lock Icon */}
                 <div className="mx-auto flex items-center justify-center h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-red-100 mb-3 sm:mb-4">
@@ -117,7 +116,6 @@ export default function Login({ onLogin, maintenanceMessage }: LoginProps) {
                 </button>
               </div>
             </div>
-          </div>
         </div>
       )}
 
