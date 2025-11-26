@@ -100,11 +100,15 @@ CREATE TABLE public.grades (
     END
   ) STORED,
 
-  -- Final average (computed from semester averages)
+  -- Final average (computed from period grades - cannot reference generated columns)
   final_average NUMERIC(5,2) GENERATED ALWAYS AS (
     CASE
-      WHEN sem1_av IS NOT NULL AND sem2_av IS NOT NULL
-      THEN (sem1_av + sem2_av) / 2.0
+      WHEN period1 IS NOT NULL AND period2 IS NOT NULL AND period3 IS NOT NULL AND exam1 IS NOT NULL
+           AND period4 IS NOT NULL AND period5 IS NOT NULL AND period6 IS NOT NULL AND exam2 IS NOT NULL
+      THEN (
+        (((period1 + period2 + period3) / 3.0) + exam1) / 2.0 +
+        (((period4 + period5 + period6) / 3.0) + exam2) / 2.0
+      ) / 2.0
       ELSE NULL
     END
   ) STORED,
