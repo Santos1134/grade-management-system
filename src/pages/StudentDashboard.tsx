@@ -46,6 +46,7 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
   const [grades, setGrades] = useState<Grade[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [ranking, setRanking] = useState<{position: number, total: number} | null>(null);
+  const [finalRanking, setFinalRanking] = useState<{position: number, total: number} | null>(null);
   const [periodRankings, setPeriodRankings] = useState<{[key: string]: {position: number, total: number}}>({});
   const [sponsorName, setSponsorName] = useState<string>('Not Assigned');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -55,6 +56,7 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
   useEffect(() => {
     loadGrades();
     calculateRanking();
+    calculateFinalRanking();
     calculatePeriodRankings();
     getSponsorName();
     checkForNewGrades();
@@ -158,6 +160,28 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
       }
     } catch (error) {
       console.error('Error calculating ranking:', error);
+    }
+  };
+
+  const calculateFinalRanking = async () => {
+    try {
+      const rankings = await gradeService.getFinalRankings(user.grade, user.section);
+      const total = rankings.length;
+      const studentRanking = rankings.find((r: any) => r.id === user.id);
+
+      if (studentRanking) {
+        setFinalRanking({
+          position: studentRanking.final_rank,
+          total: total
+        });
+      } else {
+        setFinalRanking({
+          position: total,
+          total: total
+        });
+      }
+    } catch (error) {
+      console.error('Error calculating final ranking:', error);
     }
   };
 
@@ -354,6 +378,14 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
                 <p className="text-xs sm:text-sm text-gray-600">Class Ranking</p>
                 <p className="text-base sm:text-lg md:text-2xl font-bold text-green-600">
                   {ranking.position} / {ranking.total}
+                </p>
+              </div>
+            )}
+            {finalRanking && finalRanking.position > 0 && calculateOverallAverage() && (
+              <div>
+                <p className="text-xs sm:text-sm text-gray-600">Final Ranking</p>
+                <p className="text-base sm:text-lg md:text-2xl font-bold text-purple-600">
+                  {finalRanking.position} / {finalRanking.total}
                 </p>
               </div>
             )}

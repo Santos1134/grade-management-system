@@ -96,6 +96,61 @@ export const gradeService = {
     return data;
   },
 
+  // Get final rankings based on final_average
+  async getFinalRankings(grade?: string, section?: string) {
+    let query = supabase
+      .from('profiles')
+      .select(`
+        id,
+        name,
+        grade,
+        section,
+        grades (
+          final_average
+        )
+      `)
+      .eq('role', 'student');
+
+    if (grade) {
+      query = query.eq('grade', grade);
+    }
+    if (section) {
+      query = query.eq('section', section);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    // Calculate average of final_average for each student
+    const studentsWithFinalAverage = data
+      .map((student: any) => {
+        const finalAverages = student.grades
+          .map((g: any) => g.final_average)
+          .filter((avg: number) => avg !== null && avg !== undefined);
+
+        const avgFinal = finalAverages.length > 0
+          ? finalAverages.reduce((sum: number, avg: number) => sum + avg, 0) / finalAverages.length
+          : null;
+
+        return {
+          id: student.id,
+          name: student.name,
+          grade: student.grade,
+          section: student.section,
+          final_average: avgFinal
+        };
+      })
+      .filter((s: any) => s.final_average !== null)
+      .sort((a: any, b: any) => b.final_average - a.final_average)
+      .map((student: any, index: number) => ({
+        ...student,
+        final_rank: index + 1
+      }));
+
+    return studentsWithFinalAverage;
+  },
+
   // Subscribe to grade changes for a student
   subscribeToStudentGrades(studentId: string, callback: (payload: any) => void) {
     return supabase
