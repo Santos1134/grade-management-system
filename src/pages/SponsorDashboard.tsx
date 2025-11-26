@@ -709,6 +709,8 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
             </table>
           </div>
         </div>
+      </div>
+    </div>
 
         {/* Student Grades View */}
         {selectedStudent && !showAddGrade && (

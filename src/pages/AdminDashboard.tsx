@@ -170,6 +170,10 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
       // Reload users
       await loadUsers();
+
+      // Auto-open the user list to show the newly created user
+      setUserViewType(userType === 'student' ? 'students' : 'sponsors');
+      setShowAllUsers(true);
     } catch (error: any) {
       console.error('Error creating user:', error);
       showNotification(error.message || 'Failed to create user', 'error');
@@ -256,7 +260,16 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
       // Convert plural view type to singular role for comparison
       const roleToMatch = userViewType === 'students' ? 'student' : 'sponsor';
       const viewTypeMatch = u.role === roleToMatch;
-      const gradeMatch = filterGrade === 'all' || u.grade === filterGrade;
+
+      // Get grade from nested students or sponsors object (not array)
+      let userGrade = null;
+      if (u.role === 'student' && u.students) {
+        userGrade = u.students.grade;
+      } else if (u.role === 'sponsor' && u.sponsors) {
+        userGrade = u.sponsors.grade;
+      }
+
+      const gradeMatch = filterGrade === 'all' || userGrade === filterGrade;
       return viewTypeMatch && gradeMatch;
     });
   };
@@ -264,7 +277,12 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
   const getAvailableGrades = () => {
     const grades = new Set<string>();
     users.forEach(u => {
-      if (u.grade) grades.add(u.grade);
+      // Get grade from nested students or sponsors object (not array)
+      if (u.role === 'student' && u.students) {
+        grades.add(u.students.grade);
+      } else if (u.role === 'sponsor' && u.sponsors) {
+        grades.add(u.sponsors.grade);
+      }
     });
     return Array.from(grades).sort();
   };
@@ -815,20 +833,20 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-700">7th Grade</span>
                       <span className="text-xl font-bold text-blue-600">
-                        {users.filter(u => u.role === 'student' && u.grade === '7th Grade').length}
+                        {users.filter(u => u.role === 'student' && u.students && u.students.grade === '7th Grade').length}
                       </span>
                     </div>
                     <div className="pl-4 space-y-1">
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-gray-600">Section A:</span>
                         <span className="font-semibold text-blue-700">
-                          {users.filter(u => u.role === 'student' && u.grade === '7th Grade' && u.section === 'A').length}
+                          {users.filter(u => u.role === 'student' && u.students && u.students.grade === '7th Grade' && u.students.section === 'A').length}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-gray-600">Section B:</span>
                         <span className="font-semibold text-blue-700">
-                          {users.filter(u => u.role === 'student' && u.grade === '7th Grade' && u.section === 'B').length}
+                          {users.filter(u => u.role === 'student' && u.students && u.students.grade === '7th Grade' && u.students.section === 'B').length}
                         </span>
                       </div>
                     </div>
@@ -839,20 +857,20 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-700">8th Grade</span>
                       <span className="text-xl font-bold text-blue-600">
-                        {users.filter(u => u.role === 'student' && u.grade === '8th Grade').length}
+                        {users.filter(u => u.role === 'student' && u.students && u.students.grade === '8th Grade').length}
                       </span>
                     </div>
                     <div className="pl-4 space-y-1">
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-gray-600">Section A:</span>
                         <span className="font-semibold text-blue-700">
-                          {users.filter(u => u.role === 'student' && u.grade === '8th Grade' && u.section === 'A').length}
+                          {users.filter(u => u.role === 'student' && u.students && u.students.grade === '8th Grade' && u.students.section === 'A').length}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-gray-600">Section B:</span>
                         <span className="font-semibold text-blue-700">
-                          {users.filter(u => u.role === 'student' && u.grade === '8th Grade' && u.section === 'B').length}
+                          {users.filter(u => u.role === 'student' && u.students && u.students.grade === '8th Grade' && u.students.section === 'B').length}
                         </span>
                       </div>
                     </div>
@@ -860,7 +878,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
                   {/* Other grades without sections */}
                   {['9th Grade', '10th Grade', '11th Grade', '12th Grade'].map(gradeClass => {
-                    const studentCount = users.filter(u => u.role === 'student' && u.grade === gradeClass).length;
+                    const studentCount = users.filter(u => u.role === 'student' && u.students && u.students.grade === gradeClass).length;
                     return (
                       <div key={gradeClass} className="flex items-center justify-between bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
                         <span className="text-sm font-medium text-gray-700">{gradeClass}</span>
@@ -1405,9 +1423,11 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                       </span>
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600">
-                      {user.role === 'student'
-                        ? `${user.studentId} - ${user.grade}${user.section ? ` (${user.section})` : ''}`
-                        : `${user.grade}${user.section ? ` (${user.section})` : ''}`}
+                      {user.role === 'student' && user.students
+                        ? `${user.students.student_id} - ${user.students.grade}${user.students.section ? ` (${user.students.section})` : ''}`
+                        : user.role === 'sponsor' && user.sponsors
+                        ? `${user.sponsors.grade}${user.sponsors.section ? ` (${user.sponsors.section})` : ''}`
+                        : '-'}
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm space-x-2 sm:space-x-3">
                       <button
@@ -1441,6 +1461,8 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
           </div>
         </div>
         )}

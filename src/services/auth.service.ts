@@ -16,12 +16,21 @@ export interface SignUpData extends LoginCredentials {
 export const authService = {
   // Sign in with email and password
   async signIn(credentials: LoginCredentials) {
+    console.log('===== ATTEMPTING LOGIN =====');
+    console.log('Email:', credentials.email);
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email: credentials.email,
       password: credentials.password,
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Auth error:', error);
+      throw error;
+    }
+
+    console.log('Auth successful, user ID:', data.user.id);
+    console.log('User confirmed?', data.user.email_confirmed_at);
 
     // Get user profile with role information
     const { data: profile, error: profileError } = await supabase
@@ -30,7 +39,13 @@ export const authService = {
       .eq('id', data.user.id)
       .single();
 
-    if (profileError) throw profileError;
+    if (profileError) {
+      console.error('Profile error:', profileError);
+      throw profileError;
+    }
+
+    console.log('Profile loaded:', profile);
+    console.log('============================');
 
     return { user: data.user, profile };
   },

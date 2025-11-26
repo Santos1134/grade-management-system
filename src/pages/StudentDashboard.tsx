@@ -297,6 +297,7 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
             </button>
           </div>
         </div>
+      </div>
       </header>
 
       {/* Main Content */}

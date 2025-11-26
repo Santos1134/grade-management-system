@@ -86,27 +86,25 @@ function App() {
             role: 'admin',
           };
           setCurrentUser(admin);
-        } else if (profile.role === 'sponsor' && profile.sponsors && profile.sponsors.length > 0) {
-          const sponsorData = profile.sponsors[0];
+        } else if (profile.role === 'sponsor' && profile.sponsors) {
           const sponsor: Sponsor = {
             id: profile.id,
             email: profile.email,
             name: profile.name,
             role: 'sponsor',
-            grade: sponsorData.grade,
-            section: sponsorData.section,
+            grade: profile.sponsors.grade,
+            section: profile.sponsors.section,
           };
           setCurrentUser(sponsor);
-        } else if (profile.role === 'student' && profile.students && profile.students.length > 0) {
-          const studentData = profile.students[0];
+        } else if (profile.role === 'student' && profile.students) {
           const student: Student = {
             id: profile.id,
             email: profile.email,
             name: profile.name,
             role: 'student',
-            studentId: studentData.student_id,
-            grade: studentData.grade,
-            section: studentData.section,
+            studentId: profile.students.student_id,
+            grade: profile.students.grade,
+            section: profile.students.section,
           };
           setCurrentUser(student);
         }

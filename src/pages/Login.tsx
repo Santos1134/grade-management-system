@@ -121,16 +121,6 @@ export default function Login({ onLogin }: LoginProps) {
               </svg>
               Admin Login
             </button>
-
-            {/* Demo accounts info */}
-            <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-gray-50 rounded-lg">
-              <p className="text-xs sm:text-sm text-gray-600 mb-2 font-medium">Demo Accounts:</p>
-              <div className="text-xs text-gray-500 space-y-1">
-                <p className="break-all">Student: student@school.com / password123</p>
-                <p className="break-all">Sponsor: sponsor@school.com / password123</p>
-                <p className="break-all">Admin: admin@school.com / admin123</p>
-              </div>
-            </div>
           </div>
         ) : (
           /* Login Form */
@@ -193,13 +183,6 @@ export default function Login({ onLogin }: LoginProps) {
               >
                 {isLoading ? 'Signing in...' : 'Sign In'}
               </button>
-            </div>
-
-            {/* Demo account hint */}
-            <div className="mt-3 sm:mt-4 p-2.5 sm:p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-500 break-all">
-                Demo {userType}: {userType}@school.com / {userType === 'admin' ? 'admin123' : 'password123'}
-              </p>
             </div>
 
             {/* Forgot Password Link (Only for Admin) */}
