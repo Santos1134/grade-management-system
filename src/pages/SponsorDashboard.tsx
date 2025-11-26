@@ -361,6 +361,10 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
     if (!selectedStudent) return;
 
     const gradesToSave: any[] = [];
+    const gradeChanges: any[] = [];
+
+    // Get existing grades for this student to track changes
+    const existingGrades = grades.filter(g => g.studentId === selectedStudent.id);
 
     // Process each subject that has data
     Object.values(subjectGrades).forEach(subjectGrade => {
@@ -379,6 +383,32 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
           comments: subjectGrade.comments,
         };
 
+        // Track grade changes for audit log
+        const existingGrade = existingGrades.find(g => g.subject === subjectGrade.subject);
+        if (existingGrade) {
+          // Compare each field for changes
+          const changes: any = {};
+          const fields = ['period1', 'period2', 'period3', 'exam1', 'period4', 'period5', 'period6', 'exam2'];
+
+          fields.forEach(field => {
+            const oldValue = (existingGrade as any)[field];
+            const newValue = (gradeData as any)[field];
+            if (oldValue !== newValue) {
+              changes[field] = {
+                old: oldValue || 'N/A',
+                new: newValue || 'N/A'
+              };
+            }
+          });
+
+          if (Object.keys(changes).length > 0) {
+            gradeChanges.push({
+              subject: subjectGrade.subject,
+              changes
+            });
+          }
+        }
+
         gradesToSave.push(gradeData);
       }
     });
@@ -395,14 +425,17 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
         await gradeService.upsertGrade(gradeData);
       }
 
-      // Log the change
+      // Log the change with detailed information
       await logChange(
         editMode ? 'UPDATE_GRADES' : 'ADD_GRADES',
         {
           studentId: selectedStudent.id,
           studentName: selectedStudent.name,
+          studentGrade: selectedStudent.grade,
+          studentSection: selectedStudent.section,
           subjectCount: gradesToSave.length,
           subjects: gradesToSave.map(g => g.subject),
+          gradeChanges: gradeChanges.length > 0 ? gradeChanges : undefined
         }
       );
 

@@ -1618,10 +1618,30 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                       </div>
                       <div className="text-sm text-gray-600">
                         {log.action === 'ADD_GRADES' || log.action === 'UPDATE_GRADES' ? (
-                          <div>
+                          <div className="space-y-2">
                             <p><strong>Student:</strong> {log.details.studentName}</p>
+                            <p><strong>Class:</strong> {log.details.studentGrade}{log.details.studentSection ? ` Section ${log.details.studentSection}` : ''}</p>
                             <p><strong>Subjects Updated:</strong> {log.details.subjectCount}</p>
                             <p><strong>Subjects:</strong> {log.details.subjects?.join(', ')}</p>
+
+                            {log.details.gradeChanges && log.details.gradeChanges.length > 0 && (
+                              <div className="mt-3 pt-3 border-t border-red-200 bg-red-50 p-3 rounded">
+                                <p className="font-semibold text-red-800 mb-2">⚠️ Grade Modifications Detected:</p>
+                                {log.details.gradeChanges.map((change: any, idx: number) => (
+                                  <div key={idx} className="mb-3 bg-white p-2 rounded border border-red-200">
+                                    <p className="font-medium text-gray-900">{change.subject}:</p>
+                                    {Object.entries(change.changes).map(([field, values]: [string, any]) => (
+                                      <div key={field} className="ml-4 text-xs">
+                                        <span className="text-gray-600">{field}:</span>
+                                        <span className="text-red-600 line-through ml-1">{values.old}</span>
+                                        <span className="mx-1">→</span>
+                                        <span className="text-green-600 font-semibold">{values.new}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         ) : log.action === 'CREATE_USER' ? (
                           <div>
