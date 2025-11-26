@@ -120,12 +120,6 @@ function App() {
 
       // Load user profile after successful login
       await loadUserProfile();
-
-      // If we get here but currentUser is still null, there was a role mismatch
-      if (!currentUser) {
-        alert('Login successful, but your account role does not match. Please contact your administrator.');
-        await authService.signOut();
-      }
     } catch (error: any) {
       console.error('Login error:', error);
       const errorMessage = error.message || 'Login failed! Please check your credentials.';
