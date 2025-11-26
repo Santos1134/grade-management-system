@@ -97,8 +97,6 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
   const loadAuditLogs = async () => {
     try {
       const logs = await auditService.getAllLogs();
-      console.log('Loaded audit logs:', logs);
-      console.log('Sample log details:', logs[0]?.details);
       // Map database columns to expected format
       const mappedLogs = logs.map(log => ({
         ...log,

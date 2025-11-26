@@ -371,7 +371,6 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
 
     // Get existing grades for this student to track changes
     const existingGrades = grades.filter(g => g.studentId === selectedStudent.id);
-    console.log('Existing grades for student:', existingGrades);
 
     // Process each subject that has data
     Object.values(subjectGrades).forEach(subjectGrade => {
@@ -393,7 +392,6 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
         // Track grade changes for audit log
         const existingGrade = existingGrades.find(g => g.subject === subjectGrade.subject);
         if (existingGrade) {
-          console.log(`Comparing existing grade for ${subjectGrade.subject}:`, existingGrade);
           // Compare each field for changes
           const changes: any = {};
           const fields = ['period1', 'period2', 'period3', 'exam1', 'period4', 'period5', 'period6', 'exam2'];
@@ -402,7 +400,6 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
             const oldValue = (existingGrade as any)[field];
             const newValue = (gradeData as any)[field];
             if (oldValue !== newValue) {
-              console.log(`Change detected in ${field}: ${oldValue} -> ${newValue}`);
               changes[field] = {
                 old: oldValue || 'N/A',
                 new: newValue || 'N/A'
@@ -411,7 +408,6 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
           });
 
           if (Object.keys(changes).length > 0) {
-            console.log(`Grade changes for ${subjectGrade.subject}:`, changes);
             gradeChanges.push({
               subject: subjectGrade.subject,
               changes
@@ -445,10 +441,6 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
         subjects: gradesToSave.map(g => g.subject),
         gradeChanges: gradeChanges.length > 0 ? gradeChanges : undefined
       };
-
-      console.log('Audit Log Details:', auditDetails);
-      console.log('Grade Changes Detected:', gradeChanges);
-      console.log('Edit Mode:', editMode);
 
       await logChange(
         editMode ? 'UPDATE_GRADES' : 'ADD_GRADES',
