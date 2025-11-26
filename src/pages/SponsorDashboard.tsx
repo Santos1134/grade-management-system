@@ -81,6 +81,7 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
   const [, setActiveSubjectIndex] = useState(0);
   const [showPeriodRankings, setShowPeriodRankings] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<'period1' | 'period2' | 'period3' | 'exam1' | 'period4' | 'period5' | 'period6' | 'exam2' | 'sem1Avg' | 'sem2Avg'>('period1');
+  const [isSaving, setIsSaving] = useState(false);
 
   const getSubjectsForGrade = () => {
     const isJunior = user.grade.includes('7th') || user.grade.includes('8th') || user.grade.includes('9th');
@@ -372,6 +373,7 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
       return;
     }
 
+    setIsSaving(true);
     try {
       // Save all grades to Supabase
       for (const gradeData of gradesToSave) {
@@ -403,6 +405,8 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
     } catch (error: any) {
       console.error('Error saving grades:', error);
       showNotification(error.message || 'Failed to save grades', 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1150,7 +1154,8 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                         setShowAddGrade(false);
                         setSelectedStudent(null);
                       }}
-                      className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition"
+                      disabled={isSaving}
+                      className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400"
                     >
                       Cancel
                     </button>
@@ -1158,12 +1163,25 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                     <button
                       type="button"
                       onClick={handleSaveAllGrades}
-                      className="px-8 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition flex items-center gap-2"
+                      disabled={isSaving}
+                      className="px-8 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition flex items-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      {editMode ? 'Update All Grades' : 'Save All Grades'}
+                      {isSaving ? (
+                        <>
+                          <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          {editMode ? 'Update All Grades' : 'Save All Grades'}
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>

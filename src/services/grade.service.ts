@@ -46,6 +46,9 @@ export const gradeService = {
       .upsert({
         ...gradeData,
         updated_by: currentUser?.user?.id,
+      }, {
+        onConflict: 'student_id,subject',
+        ignoreDuplicates: false
       })
       .select()
       .single();

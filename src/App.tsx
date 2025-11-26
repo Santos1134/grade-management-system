@@ -111,12 +111,14 @@ function App() {
       }
     } catch (error) {
       console.error('Error loading profile:', error);
+      throw error; // Re-throw to be caught by handleLogin
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleLogin = async (credentials: LoginCredentials) => {
     try {
-      setLoading(true);
       await authService.signIn(credentials);
 
       // Load user profile after successful login
@@ -133,8 +135,6 @@ function App() {
       } else {
         alert(errorMessage);
       }
-    } finally {
-      setLoading(false);
     }
   };
 
