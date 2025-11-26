@@ -164,4 +164,84 @@ export const adminService = {
 
     if (error) throw error;
   },
+
+  // Get current maintenance mode status
+  async getMaintenanceMode() {
+    const { data, error } = await supabase
+      .from('maintenance_mode')
+      .select('*')
+      .limit(1)
+      .single();
+
+    if (error) {
+      // If table doesn't exist or no record, return default
+      return { is_enabled: false, message: 'Grades input is in progress. Please try again later.' };
+    }
+    return data;
+  },
+
+  // Toggle maintenance mode on/off
+  async toggleMaintenanceMode(isEnabled: boolean, message?: string) {
+    const { data: currentUser } = await supabase.auth.getUser();
+
+    // Try to get existing record
+    const { data: existingRecord } = await supabase
+      .from('maintenance_mode')
+      .select('id')
+      .limit(1)
+      .single();
+
+    const updateData: any = {
+      is_enabled: isEnabled,
+      enabled_by: isEnabled ? currentUser?.user?.id : null,
+      enabled_at: isEnabled ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (message) {
+      updateData.message = message;
+    }
+
+    let result;
+    if (existingRecord) {
+      // Update existing record
+      const { data, error } = await supabase
+        .from('maintenance_mode')
+        .update(updateData)
+        .eq('id', existingRecord.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      result = data;
+    } else {
+      // Insert new record if none exists
+      const { data, error } = await supabase
+        .from('maintenance_mode')
+        .insert(updateData)
+        .select()
+        .single();
+
+      if (error) throw error;
+      result = data;
+    }
+
+    return result;
+  },
+
+  // Subscribe to maintenance mode changes
+  subscribeToMaintenanceMode(callback: (payload: any) => void) {
+    return supabase
+      .channel('maintenance_mode_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'maintenance_mode',
+        },
+        callback
+      )
+      .subscribe();
+  },
 };

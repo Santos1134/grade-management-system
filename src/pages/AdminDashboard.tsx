@@ -46,7 +46,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
   const [selectedPeriod, setSelectedPeriod] = useState<'period1' | 'period2' | 'period3' | 'exam1' | 'period4' | 'period5' | 'period6' | 'exam2' | 'sem1Avg' | 'sem2Avg' | 'finalAvg'>('period1');
   const [selectedGradeForRanking, setSelectedGradeForRanking] = useState<string>('all');
   const [rankingView, setRankingView] = useState<'all' | 'honor'>('all');
-  const [showAllUsers, setShowAllUsers] = useState(false);
+  const [showAllUsers, setShowAllUsers] = useState(true);
   const [userViewType, setUserViewType] = useState<'students' | 'sponsors'>('students');
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -54,6 +54,8 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [periodRankings, setPeriodRankings] = useState<any[]>([]);
   const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [maintenanceMode, setMaintenanceMode] = useState<{ is_enabled: boolean; message: string }>({ is_enabled: false, message: 'Grades input is in progress. Please try again later.' });
+  const [isTogglingMaintenance, setIsTogglingMaintenance] = useState(false);
 
   // Load users from Supabase
   const loadUsers = async () => {
@@ -66,9 +68,19 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     }
   };
 
+  const loadMaintenanceMode = async () => {
+    try {
+      const data = await adminService.getMaintenanceMode();
+      setMaintenanceMode(data);
+    } catch (error) {
+      console.error('Error loading maintenance mode:', error);
+    }
+  };
+
   useEffect(() => {
     loadUsers();
     loadAuditLogs();
+    loadMaintenanceMode();
   }, []);
 
   useEffect(() => {
@@ -192,6 +204,26 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
   const handleDeleteUser = (userId: string, userName: string) => {
     setDeleteConfirm({ userId, userName });
+  };
+
+  const handleToggleMaintenanceMode = async () => {
+    setIsTogglingMaintenance(true);
+    try {
+      const newState = !maintenanceMode.is_enabled;
+      const result = await adminService.toggleMaintenanceMode(newState, maintenanceMode.message);
+      setMaintenanceMode(result);
+      showNotification(
+        newState
+          ? 'Maintenance mode enabled - Students cannot log in'
+          : 'Maintenance mode disabled - Students can now log in',
+        'success'
+      );
+    } catch (error) {
+      console.error('Error toggling maintenance mode:', error);
+      showNotification('Failed to toggle maintenance mode', 'error');
+    } finally {
+      setIsTogglingMaintenance(false);
+    }
   };
 
   const confirmDelete = async () => {
@@ -753,6 +785,48 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 <h2 className="text-lg font-semibold text-gray-900">Security & Settings</h2>
               </div>
               <nav className="p-4 space-y-2">
+                {/* Maintenance Mode Toggle */}
+                <button
+                  onClick={handleToggleMaintenanceMode}
+                  disabled={isTogglingMaintenance}
+                  className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-left rounded-lg transition group ${
+                    maintenanceMode.is_enabled
+                      ? 'bg-red-50 hover:bg-red-100 border-2 border-red-300'
+                      : 'bg-gray-50 hover:bg-gray-100 border-2 border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg transition ${
+                      maintenanceMode.is_enabled
+                        ? 'bg-red-200'
+                        : 'bg-gray-200'
+                    }`}>
+                      <svg className={`w-5 h-5 ${maintenanceMode.is_enabled ? 'text-red-700' : 'text-gray-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        {maintenanceMode.is_enabled ? (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        ) : (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                        )}
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <span className={`font-medium block ${maintenanceMode.is_enabled ? 'text-red-800' : 'text-gray-700'}`}>
+                        {maintenanceMode.is_enabled ? 'Maintenance Mode: ON' : 'Maintenance Mode: OFF'}
+                      </span>
+                      <span className="text-xs text-gray-500 block mt-0.5">
+                        {maintenanceMode.is_enabled ? 'Students cannot log in' : 'Click to block student access'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    maintenanceMode.is_enabled
+                      ? 'bg-red-200 text-red-800'
+                      : 'bg-gray-200 text-gray-700'
+                  }`}>
+                    {maintenanceMode.is_enabled ? 'ACTIVE' : 'Inactive'}
+                  </div>
+                </button>
+
                 <button
                   onClick={() => setShowChangePassword(true)}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-orange-50 rounded-lg transition group"

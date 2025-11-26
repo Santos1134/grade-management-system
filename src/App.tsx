@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import { authService } from './services/auth.service';
+import { adminService } from './services/admin.service';
 import Login from './pages/Login';
 import StudentDashboard from './pages/StudentDashboard';
 import SponsorDashboard from './pages/SponsorDashboard';
@@ -123,6 +124,19 @@ function App() {
 
       // Load user profile after successful login
       await loadUserProfile();
+
+      // Check maintenance mode for students
+      const result = await authService.getCurrentUser();
+      if (result && result.profile && result.profile.role === 'student') {
+        const maintenanceMode = await adminService.getMaintenanceMode();
+        if (maintenanceMode.is_enabled) {
+          // Log out the student immediately
+          await authService.signOut();
+          setCurrentUser(null);
+          alert(maintenanceMode.message || 'Grades input is in progress. Please try again later.');
+          return;
+        }
+      }
     } catch (error: any) {
       console.error('Login error:', error);
       const errorMessage = error.message || 'Login failed! Please check your credentials.';
