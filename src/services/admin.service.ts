@@ -164,6 +164,69 @@ export const adminService = {
     if (error) throw error;
   },
 
+  // Reset user password by recreating the account
+  // This is the most practical client-side approach without service role access
+  // Returns the new temporary password
+  async resetUserPassword(userId: string): Promise<{ email: string; password: string; name: string; role: string }> {
+    // Get user details before deletion
+    const { data: userData, error: fetchError } = await supabase
+      .from('profiles')
+      .select(`
+        *,
+        students (*),
+        sponsors (*)
+      `)
+      .eq('id', userId)
+      .single();
+
+    if (fetchError) throw fetchError;
+    if (!userData) throw new Error('User not found');
+
+    // Store user information for recreation
+    const userInfo: CreateUserData = {
+      email: userData.email,
+      password: '', // Will be set below
+      name: userData.name,
+      role: userData.role,
+    };
+
+    // Add role-specific data
+    if (userData.role === 'student' && userData.students?.[0]) {
+      userInfo.studentId = userData.students[0].student_id;
+      userInfo.grade = userData.students[0].grade;
+      userInfo.section = userData.students[0].section;
+    } else if (userData.role === 'sponsor' && userData.sponsors?.[0]) {
+      userInfo.grade = userData.sponsors[0].grade;
+      userInfo.section = userData.sponsors[0].section;
+    }
+
+    // Generate temporary password
+    const tempPassword = `Temp${Math.floor(1000 + Math.random() * 9000)}!`;
+    userInfo.password = tempPassword;
+
+    // Delete the user (this will cascade and delete auth user via trigger)
+    await this.deleteUser(userId);
+
+    // Wait a moment for deletion to propagate
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Recreate the user with new password
+    await this.createUser(userInfo);
+
+    return {
+      email: userInfo.email,
+      password: tempPassword,
+      name: userInfo.name,
+      role: userInfo.role
+    };
+  },
+
+  // Generate temporary password for new users or password reset
+  generateTemporaryPassword(): string {
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    return `Temp${randomNum}!`;
+  },
+
   // Get current maintenance mode status
   async getMaintenanceMode() {
     const { data, error } = await supabase

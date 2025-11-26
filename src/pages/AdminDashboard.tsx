@@ -56,6 +56,9 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState<{ is_enabled: boolean; message: string }>({ is_enabled: false, message: 'Grades input is in progress. Please try again later.' });
   const [isTogglingMaintenance, setIsTogglingMaintenance] = useState(false);
+  const [resetPasswordModal, setResetPasswordModal] = useState<{ userId: string; userName: string } | null>(null);
+  const [resetPasswordResult, setResetPasswordResult] = useState<{ email: string; password: string; name: string; role: string } | null>(null);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   // Load users from Supabase
   const loadUsers = async () => {
@@ -204,6 +207,41 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     setDeleteConfirm({ userId, userName });
   };
 
+  const handleResetPassword = (userId: string, userName: string) => {
+    setResetPasswordModal({ userId, userName });
+    setResetPasswordResult(null);
+  };
+
+  const confirmResetPassword = async () => {
+    if (!resetPasswordModal) return;
+
+    setIsResettingPassword(true);
+    try {
+      const result = await adminService.resetUserPassword(resetPasswordModal.userId);
+      setResetPasswordResult(result);
+
+      // Log the password reset action
+      await auditService.logAction({
+        action: 'RESET_PASSWORD',
+        details: {
+          userId: resetPasswordModal.userId,
+          userName: resetPasswordModal.userName,
+          userEmail: result.email,
+          userRole: result.role
+        }
+      });
+
+      showNotification(`Password reset successful for ${resetPasswordModal.userName}`, 'success');
+      await loadUsers(); // Reload users list
+    } catch (error: any) {
+      console.error('Error resetting password:', error);
+      showNotification(error.message || 'Failed to reset password', 'error');
+      setResetPasswordModal(null);
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
   const handleToggleMaintenanceMode = async () => {
     setIsTogglingMaintenance(true);
     try {
@@ -236,21 +274,6 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
       console.error('Error deleting user:', error);
       showNotification(error.message || 'Failed to delete user', 'error');
     }
-  };
-
-  const handleResetPassword = async (_userId: string, _userName: string) => {
-    showNotification(
-      'Password reset requires service role access. Please reset passwords through Supabase Dashboard: Authentication > Users',
-      'error'
-    );
-
-    // Note: To reset a user's password in Supabase:
-    // 1. Go to Supabase Dashboard
-    // 2. Click Authentication > Users
-    // 3. Find the user and click on them
-    // 4. Update their password
-    //
-    // Alternatively, implement a password reset email flow
   };
 
   const handleChangePassword = async () => {
@@ -1597,6 +1620,108 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 Delete User
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Modal */}
+      {resetPasswordModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl p-4 sm:p-6 w-full max-w-md mx-4">
+            {!resetPasswordResult ? (
+              <>
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900">Reset Password</h3>
+                    <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                      Reset password for <span className="font-semibold break-words">{resetPasswordModal.userName}</span>?
+                    </p>
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-xs text-yellow-800">
+                        <strong>⚠️ Important:</strong> This will delete and recreate the user account with a new temporary password. All user data will be preserved.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 sm:gap-3 mt-4 sm:mt-6">
+                  <button
+                    onClick={() => setResetPasswordModal(null)}
+                    disabled={isResettingPassword}
+                    className="flex-1 px-3 sm:px-4 py-2.5 sm:py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-semibold text-sm sm:text-base min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmResetPassword}
+                    disabled={isResettingPassword}
+                    className="flex-1 px-3 sm:px-4 py-2.5 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold text-sm sm:text-base min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {isResettingPassword ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Resetting...
+                      </>
+                    ) : (
+                      'Reset Password'
+                    )}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-center mb-4">
+                  <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-3">
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900">Password Reset Successful!</h3>
+                  <p className="text-sm text-gray-600 mt-2">
+                    New temporary password for <strong>{resetPasswordResult.name}</strong>
+                  </p>
+                </div>
+
+                <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mb-4">
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-gray-600">Email:</span>
+                      <p className="font-mono font-semibold text-gray-900 break-all">{resetPasswordResult.email}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Temporary Password:</span>
+                      <p className="font-mono font-bold text-lg text-blue-600 bg-white px-3 py-2 rounded border border-blue-200 break-all">
+                        {resetPasswordResult.password}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                  <p className="text-xs text-yellow-800">
+                    <strong>⚠️ Important:</strong> Copy this password now! You won't be able to see it again. Share it securely with the user.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setResetPasswordModal(null);
+                    setResetPasswordResult(null);
+                  }}
+                  className="w-full px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold min-h-[48px]"
+                >
+                  Done
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
