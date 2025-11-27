@@ -60,6 +60,28 @@ function App() {
     };
   }, []);
 
+  // Listen for maintenance mode changes and log out students
+  useEffect(() => {
+    if (!currentUser) return;
+
+    // Only students need to be monitored for maintenance mode
+    if (currentUser.role !== 'student') return;
+
+    const maintenanceSubscription = adminService.subscribeToMaintenanceMode(async (payload) => {
+      if (payload.new && payload.new.is_enabled) {
+        // Maintenance mode was just enabled - log out the student
+        const message = payload.new.message || 'Grades input is in progress. Please try again later.';
+        await authService.signOut();
+        setCurrentUser(null);
+        setMaintenanceMessage(message);
+      }
+    });
+
+    return () => {
+      maintenanceSubscription.unsubscribe();
+    };
+  }, [currentUser]);
+
   const checkSession = async () => {
     try {
       const session = await authService.getSession();
