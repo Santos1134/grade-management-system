@@ -8,14 +8,6 @@
 
 import { supabase } from '../lib/supabase';
 
-interface LoginAttempt {
-  email: string;
-  timestamp: number;
-  success: boolean;
-  ip_address?: string;
-  user_agent?: string;
-}
-
 interface SecurityEvent {
   email: string;
   event_type: string;
