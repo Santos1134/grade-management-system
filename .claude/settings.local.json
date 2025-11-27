@@ -43,7 +43,8 @@
       "Bash(vercel inspect:*)",
       "Bash(start https://grade-management-frontend-4ps57xi1a-santos1134s-projects.vercel.app)",
       "Bash(vercel env:*)",
-      "Bash(start https://grade-management-frontend-alpha.vercel.app)"
+      "Bash(start https://grade-management-frontend-alpha.vercel.app)",
+      "Bash(start https://grade-management-frontend-alpha.vercel.app/admin)"
     ],
     "deny": [],
     "ask": []

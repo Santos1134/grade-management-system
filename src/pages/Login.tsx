@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { securityService } from '../services/security.service';
 
 interface LoginCredentials {
   email: string;
@@ -6,7 +7,7 @@ interface LoginCredentials {
 }
 
 interface LoginProps {
-  onLogin: (credentials: LoginCredentials) => void;
+  onLogin: (credentials: LoginCredentials) => Promise<void>;
   maintenanceMessage?: string | null;
 }
 
@@ -16,15 +17,67 @@ export default function Login({ onLogin, maintenanceMessage }: LoginProps) {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [securityError, setSecurityError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSecurityError(null);
+
+    // Sanitize inputs
+    const sanitizedEmail = securityService.sanitizeInput(email.trim().toLowerCase());
+    const sanitizedPassword = password.trim();
+
+    // Validate email format
+    if (!securityService.isValidEmail(sanitizedEmail)) {
+      setSecurityError('Invalid email format');
+      return;
+    }
+
+    // Check if account is locked
+    if (securityService.isLockedOut(sanitizedEmail)) {
+      const minutes = securityService.getLockoutTimeRemaining(sanitizedEmail);
+      setSecurityError(
+        `Account temporarily locked due to multiple failed login attempts. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`
+      );
+      return;
+    }
+
+    // Check remaining attempts
+    const remainingAttempts = securityService.getRemainingAttempts(sanitizedEmail);
+    if (remainingAttempts <= 2 && remainingAttempts > 0) {
+      console.warn(`[Security] ${remainingAttempts} login attempts remaining`);
+    }
+
     setIsLoading(true);
 
-    // Trim whitespace from email and password before submitting
-    await onLogin({ email: email.trim(), password: password.trim() });
+    try {
+      await onLogin({ email: sanitizedEmail, password: sanitizedPassword });
+      // Success - record successful login
+      securityService.recordLoginAttempt(sanitizedEmail, true);
+    } catch (error) {
+      // Failure - record failed attempt
+      securityService.recordLoginAttempt(sanitizedEmail, false);
 
-    setIsLoading(false);
+      // Apply progressive delay
+      await securityService.applyProgressiveDelay(sanitizedEmail);
+
+      // Check if now locked out
+      if (securityService.isLockedOut(sanitizedEmail)) {
+        const minutes = securityService.getLockoutTimeRemaining(sanitizedEmail);
+        setSecurityError(
+          `Account locked due to too many failed attempts. Please try again in ${minutes} minutes.`
+        );
+      } else {
+        const remaining = securityService.getRemainingAttempts(sanitizedEmail);
+        if (remaining > 0) {
+          setSecurityError(
+            `Invalid credentials. ${remaining} attempt${remaining > 1 ? 's' : ''} remaining before account lockout.`
+          );
+        }
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleBack = () => {
@@ -35,6 +88,19 @@ export default function Login({ onLogin, maintenanceMessage }: LoginProps) {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative">
+      {/* Security Error Alert */}
+      {securityError && (
+        <div className="fixed top-4 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-md z-50 px-4 sm:px-6 py-3 sm:py-4 rounded-lg shadow-lg bg-red-600 text-white text-sm sm:text-base">
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span className="flex-1">{securityError}</span>
+            <button onClick={() => setSecurityError(null)} className="ml-2 font-bold text-xl flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center -mr-2">×</button>
+          </div>
+        </div>
+      )}
+
       {/* Maintenance Mode Modal */}
       {maintenanceMessage && (
         <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4 overflow-y-auto">

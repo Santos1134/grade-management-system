@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { securityService } from '../services/security.service';
 
 interface LoginCredentials {
   email: string;
@@ -6,7 +7,7 @@ interface LoginCredentials {
 }
 
 interface AdminLoginProps {
-  onLogin: (credentials: LoginCredentials) => void;
+  onLogin: (credentials: LoginCredentials) => Promise<void>;
 }
 
 export default function AdminLogin({ onLogin }: AdminLoginProps) {
@@ -20,12 +21,55 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setNotification(null);
+
+    // Sanitize inputs
+    const sanitizedEmail = securityService.sanitizeInput(email.trim().toLowerCase());
+    const sanitizedPassword = password.trim();
+
+    // Validate email format
+    if (!securityService.isValidEmail(sanitizedEmail)) {
+      setNotification({ message: 'Invalid email format', type: 'error' });
+      return;
+    }
+
+    // Check if account is locked
+    if (securityService.isLockedOut(sanitizedEmail)) {
+      const minutes = securityService.getLockoutTimeRemaining(sanitizedEmail);
+      setNotification({
+        message: `Account temporarily locked. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`,
+        type: 'error'
+      });
+      return;
+    }
+
     setIsLoading(true);
 
-    // Trim whitespace from email and password before submitting
-    await onLogin({ email: email.trim(), password: password.trim() });
+    try {
+      await onLogin({ email: sanitizedEmail, password: sanitizedPassword });
+      securityService.recordLoginAttempt(sanitizedEmail, true);
+    } catch (error) {
+      securityService.recordLoginAttempt(sanitizedEmail, false);
+      await securityService.applyProgressiveDelay(sanitizedEmail);
 
-    setIsLoading(false);
+      if (securityService.isLockedOut(sanitizedEmail)) {
+        const minutes = securityService.getLockoutTimeRemaining(sanitizedEmail);
+        setNotification({
+          message: `Account locked due to multiple failed attempts. Try again in ${minutes} minutes.`,
+          type: 'error'
+        });
+      } else {
+        const remaining = securityService.getRemainingAttempts(sanitizedEmail);
+        if (remaining > 0) {
+          setNotification({
+            message: `Invalid credentials. ${remaining} attempt${remaining > 1 ? 's' : ''} remaining.`,
+            type: 'error'
+          });
+        }
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleForgotPassword = () => {
