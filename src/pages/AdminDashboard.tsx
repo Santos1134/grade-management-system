@@ -56,8 +56,9 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState<{ is_enabled: boolean; message: string }>({ is_enabled: false, message: 'Grades input is in progress. Please try again later.' });
   const [isTogglingMaintenance, setIsTogglingMaintenance] = useState(false);
-  const [resetPasswordModal, setResetPasswordModal] = useState<{ userId: string; userName: string } | null>(null);
+  const [resetPasswordModal, setResetPasswordModal] = useState<{ userId: string; userName: string; userRole: string } | null>(null);
   const [resetPasswordResult, setResetPasswordResult] = useState<{ email: string; password: string; name: string; role: string } | null>(null);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   // Load users from Supabase
   const loadUsers = async () => {
@@ -206,20 +207,40 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     setDeleteConfirm({ userId, userName });
   };
 
-  const handleResetPassword = (userId: string, userName: string) => {
-    setResetPasswordModal({ userId, userName });
+  const handleResetPassword = (userId: string, userName: string, userRole: string) => {
+    setResetPasswordModal({ userId, userName, userRole });
     setResetPasswordResult(null);
   };
 
   const confirmResetPassword = async () => {
-    // This feature requires backend implementation for security
-    // Show instructions to admin
-    setResetPasswordResult({
-      email: 'Instructions',
-      password: 'See Below',
-      name: resetPasswordModal?.userName || '',
-      role: 'info'
-    });
+    if (!resetPasswordModal) return;
+
+    setIsResettingPassword(true);
+    try {
+      const result = await adminService.resetUserPassword(resetPasswordModal.userId);
+      setResetPasswordResult(result);
+
+      // Log the password reset action
+      await auditService.logAction({
+        action: 'RESET_PASSWORD',
+        details: {
+          userId: resetPasswordModal.userId,
+          userName: resetPasswordModal.userName,
+          userEmail: result.email,
+          userRole: result.role,
+          warning: result.role === 'student' ? 'All grades were deleted during password reset' : 'User data preserved'
+        }
+      });
+
+      showNotification(`Password reset successful for ${resetPasswordModal.userName}`, 'success');
+      await loadUsers(); // Reload users list
+    } catch (error: any) {
+      console.error('Error resetting password:', error);
+      showNotification(error.message || 'Failed to reset password', 'error');
+      setResetPasswordModal(null);
+    } finally {
+      setIsResettingPassword(false);
+    }
   };
 
   const handleToggleMaintenanceMode = async () => {
@@ -1528,7 +1549,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm space-x-2 sm:space-x-3">
                       <button
-                        onClick={() => handleResetPassword(user.id, user.name)}
+                        onClick={() => handleResetPassword(user.id, user.name, user.role)}
                         className="text-blue-600 hover:text-blue-800 font-semibold"
                       >
                         Reset
@@ -1617,15 +1638,23 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                     </svg>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-base sm:text-lg font-semibold text-gray-900">Password Reset Info</h3>
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900">Reset Password</h3>
                     <p className="text-xs sm:text-sm text-gray-600 mt-1">
-                      For user: <span className="font-semibold break-words">{resetPasswordModal.userName}</span>
+                      For: <span className="font-semibold break-words">{resetPasswordModal.userName}</span> ({resetPasswordModal.userRole})
                     </p>
-                    <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-xs text-blue-800">
-                        <strong>ℹ️ Note:</strong> Password reset requires Supabase Dashboard access. Click "View Instructions" to see how to reset the password.
-                      </p>
-                    </div>
+                    {resetPasswordModal.userRole === 'student' ? (
+                      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-xs text-red-800">
+                          <strong>⚠️ WARNING:</strong> Resetting a student's password will <strong>DELETE ALL THEIR GRADES</strong>! This action cannot be undone. Only proceed if you're sure.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-xs text-blue-800">
+                          <strong>ℹ️ Note:</strong> This will delete and recreate the {resetPasswordModal.userRole} account with a new temporary password. All data will be preserved.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1638,70 +1667,69 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                   </button>
                   <button
                     onClick={confirmResetPassword}
-                    className="flex-1 px-3 sm:px-4 py-2.5 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold text-sm sm:text-base min-h-[48px]"
+                    disabled={isResettingPassword}
+                    className={`flex-1 px-3 sm:px-4 py-2.5 sm:py-2 text-white rounded-lg transition font-semibold text-sm sm:text-base min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                      resetPasswordModal.userRole === 'student' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
+                    }`}
                   >
-                    View Instructions
+                    {isResettingPassword ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Resetting...
+                      </>
+                    ) : (
+                      resetPasswordModal.userRole === 'student' ? 'Reset & Delete Grades' : 'Reset Password'
+                    )}
                   </button>
                 </div>
               </>
             ) : (
               <>
                 <div className="text-center mb-4">
-                  <div className="mx-auto w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-3">
-                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-3">
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-bold text-gray-900">Password Reset Instructions</h3>
+                  <h3 className="text-lg font-bold text-gray-900">Password Reset Successful!</h3>
                   <p className="text-sm text-gray-600 mt-2">
-                    For user: <strong>{resetPasswordResult.name}</strong>
+                    New temporary password for <strong>{resetPasswordResult.name}</strong>
                   </p>
                 </div>
 
                 <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mb-4">
-                  <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    How to Reset Password via Supabase Dashboard:
-                  </h4>
-                  <ol className="space-y-2 text-sm text-gray-700">
-                    <li className="flex gap-2">
-                      <span className="font-bold text-blue-600 min-w-[20px]">1.</span>
-                      <span>Go to <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800">Supabase Dashboard</a></span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="font-bold text-blue-600 min-w-[20px]">2.</span>
-                      <span>Select your project</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="font-bold text-blue-600 min-w-[20px]">3.</span>
-                      <span>Click <strong>Authentication</strong> → <strong>Users</strong></span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="font-bold text-blue-600 min-w-[20px]">4.</span>
-                      <span>Find the user and click on them</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="font-bold text-blue-600 min-w-[20px]">5.</span>
-                      <span>Click <strong>Reset Password</strong> or <strong>Send Password Reset Email</strong></span>
-                    </li>
-                  </ol>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-gray-600">Email:</span>
+                      <p className="font-mono font-semibold text-gray-900 break-all">{resetPasswordResult.email}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Temporary Password:</span>
+                      <p className="font-mono font-bold text-lg text-blue-600 bg-white px-3 py-2 rounded border border-blue-200 break-all">
+                        {resetPasswordResult.password}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Role:</span>
+                      <p className="font-semibold text-gray-900 capitalize">{resetPasswordResult.role}</p>
+                    </div>
+                  </div>
                 </div>
+
+                {resetPasswordResult.role === 'student' && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                    <p className="text-xs text-red-800">
+                      <strong>⚠️ Important:</strong> All grades for this student have been deleted. They will need to have their grades re-entered.
+                    </p>
+                  </div>
+                )}
 
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-                  <p className="text-xs text-yellow-800 mb-2">
-                    <strong>⚠️ Why can't this be done in the app?</strong>
-                  </p>
-                  <p className="text-xs text-gray-700">
-                    Password reset requires Supabase service role access, which cannot be safely exposed in client-side code for security reasons.
-                  </p>
-                </div>
-
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
-                  <p className="text-xs text-gray-700">
-                    <strong>Alternative:</strong> Delete the user and recreate with a new password<br/>
-                    <span className="text-red-600">⚠️ Warning: This will delete all grades if the user is a student!</span>
+                  <p className="text-xs text-yellow-800">
+                    <strong>📋 Copy this password now!</strong> You won't be able to see it again. Share it securely with the user.
                   </p>
                 </div>
 
@@ -1710,9 +1738,9 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                     setResetPasswordModal(null);
                     setResetPasswordResult(null);
                   }}
-                  className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold min-h-[48px]"
+                  className="w-full px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold min-h-[48px]"
                 >
-                  Got It
+                  Done
                 </button>
               </>
             )}
