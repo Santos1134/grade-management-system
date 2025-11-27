@@ -11,14 +11,11 @@ interface LoginProps {
 }
 
 export default function Login({ onLogin, maintenanceMessage }: LoginProps) {
-  const [userType, setUserType] = useState<'student' | 'sponsor' | 'admin' | null>(null);
+  const [userType, setUserType] = useState<'student' | 'sponsor' | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,39 +33,8 @@ export default function Login({ onLogin, maintenanceMessage }: LoginProps) {
     setPassword('');
   };
 
-  const handleForgotPassword = () => {
-    if (!resetEmail) {
-      setNotification({ message: 'Please enter your email address', type: 'error' });
-      return;
-    }
-
-    // Note: Password reset in Supabase requires using the built-in auth.resetPasswordForEmail()
-    // This is handled by Supabase's authentication system
-    setNotification({
-      message: 'Password reset must be done through Supabase Dashboard: Authentication > Users',
-      type: 'error'
-    });
-
-    setTimeout(() => {
-      setShowForgotPassword(false);
-      setResetEmail('');
-    }, 3000);
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative">
-      {/* Notification */}
-      {notification && (
-        <div className={`fixed top-4 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-md z-50 px-4 sm:px-6 py-3 sm:py-4 rounded-lg shadow-lg ${
-          notification.type === 'success' ? 'bg-green-600' : 'bg-red-600'
-        } text-white text-sm sm:text-base`}>
-          <div className="flex items-center gap-2">
-            <span className="flex-1">{notification.message}</span>
-            <button onClick={() => setNotification(null)} className="ml-2 font-bold text-xl flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center -mr-2">×</button>
-          </div>
-        </div>
-      )}
-
       {/* Maintenance Mode Modal */}
       {maintenanceMessage && (
         <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4 overflow-y-auto">
@@ -161,17 +127,6 @@ export default function Login({ onLogin, maintenanceMessage }: LoginProps) {
               </svg>
               Login as Sponsor
             </button>
-
-            <button
-              onClick={() => setUserType('admin')}
-              className="w-full bg-gray-700 text-white py-3 sm:py-4 rounded-lg font-semibold hover:bg-gray-800 transition flex items-center justify-center gap-2 min-h-[48px] text-sm sm:text-base"
-            >
-              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              Admin Login
-            </button>
           </div>
         ) : (
           /* Login Form */
@@ -228,63 +183,13 @@ export default function Login({ onLogin, maintenanceMessage }: LoginProps) {
                 disabled={isLoading}
                 className={`flex-1 ${
                   userType === 'student' ? 'bg-green-600 hover:bg-green-700' :
-                  userType === 'sponsor' ? 'bg-green-700 hover:bg-green-800' :
-                  'bg-gray-700 hover:bg-gray-800'
+                  'bg-green-700 hover:bg-green-800'
                 } text-white py-2.5 sm:py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] text-sm sm:text-base`}
               >
                 {isLoading ? 'Signing in...' : 'Sign In'}
               </button>
             </div>
-
-            {/* Forgot Password Link (Only for Admin) */}
-            {userType === 'admin' && (
-              <div className="text-center mt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowForgotPassword(true)}
-                  className="text-sm text-blue-600 hover:text-blue-800 underline"
-                >
-                  Forgot Password?
-                </button>
-              </div>
-            )}
           </form>
-        )}
-
-        {/* Forgot Password Modal */}
-        {showForgotPassword && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl p-4 sm:p-6 w-full max-w-md mx-4">
-              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4">Reset Admin Password</h3>
-              <p className="text-sm text-gray-600 mb-3 sm:mb-4">
-                Enter your admin email address to receive a password reset token.
-              </p>
-              <input
-                type="email"
-                value={resetEmail}
-                onChange={(e) => setResetEmail(e.target.value)}
-                placeholder="admin@school.com"
-                className="w-full px-3 sm:px-4 py-2.5 sm:py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none mb-3 sm:mb-4 min-h-[44px]"
-              />
-              <div className="flex gap-2 sm:gap-3">
-                <button
-                  onClick={() => {
-                    setShowForgotPassword(false);
-                    setResetEmail('');
-                  }}
-                  className="flex-1 px-3 sm:px-4 py-2.5 sm:py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition min-h-[48px] text-sm sm:text-base font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleForgotPassword}
-                  className="flex-1 px-3 sm:px-4 py-2.5 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition min-h-[48px] text-sm sm:text-base font-semibold"
-                >
-                  Send Reset Link
-                </button>
-              </div>
-            </div>
-          </div>
         )}
       </div>
     </div>

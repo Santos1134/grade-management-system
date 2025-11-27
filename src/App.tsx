@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
 import { authService } from './services/auth.service';
 import { adminService } from './services/admin.service';
 import Login from './pages/Login';
+import AdminLogin from './pages/AdminLogin';
 import StudentDashboard from './pages/StudentDashboard';
 import SponsorDashboard from './pages/SponsorDashboard';
 import AdminDashboard from './pages/AdminDashboard';
@@ -208,39 +210,41 @@ function App() {
     );
   }
 
-  // Render based on current user state
-  if (currentUser) {
-    if (currentUser.role === 'student') {
-      return (
-        <>
-          <StudentDashboard user={currentUser as Student} onLogout={handleLogout} />
-          <Analytics />
-        </>
-      );
+  // Component to handle rendering based on authentication and route
+  const AppContent = () => {
+    const location = useLocation();
+    const isAdminRoute = location.pathname === '/admin';
+
+    // Show dashboards if user is authenticated
+    if (currentUser) {
+      if (currentUser.role === 'student') {
+        return <StudentDashboard user={currentUser as Student} onLogout={handleLogout} />;
+      }
+      if (currentUser.role === 'sponsor') {
+        return <SponsorDashboard user={currentUser as Sponsor} onLogout={handleLogout} />;
+      }
+      if (currentUser.role === 'admin') {
+        return <AdminDashboard user={currentUser as Admin} onLogout={handleLogout} />;
+      }
     }
-    if (currentUser.role === 'sponsor') {
-      return (
-        <>
-          <SponsorDashboard user={currentUser as Sponsor} onLogout={handleLogout} />
-          <Analytics />
-        </>
-      );
+
+    // Show appropriate login page based on route
+    if (isAdminRoute) {
+      return <AdminLogin onLogin={handleLogin} />;
     }
-    if (currentUser.role === 'admin') {
-      return (
-        <>
-          <AdminDashboard user={currentUser as Admin} onLogout={handleLogout} />
-          <Analytics />
-        </>
-      );
-    }
-  }
+
+    return <Login onLogin={handleLogin} maintenanceMessage={maintenanceMessage} />;
+  };
 
   return (
-    <>
-      <Login onLogin={handleLogin} maintenanceMessage={maintenanceMessage} />
+    <Router>
+      <Routes>
+        <Route path="/" element={<AppContent />} />
+        <Route path="/admin" element={<AppContent />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
       <Analytics />
-    </>
+    </Router>
   );
 }
 
