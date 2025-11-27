@@ -904,28 +904,28 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
           };
 
           return (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-lg shadow-xl w-full max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto">
+              <div className="bg-white rounded-lg shadow-xl w-full max-w-[98vw] sm:max-w-[95vw] max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden my-4">
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-gray-200 bg-white flex-shrink-0">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold text-gray-900">
-                        {editMode ? 'Edit' : 'Add'} Grades for {selectedStudent.name}
+                <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 bg-white flex-shrink-0">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-base sm:text-xl font-bold text-gray-900 truncate">
+                        {editMode ? 'Edit' : 'Add'} Grades - {selectedStudent.name}
                       </h3>
-                      <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                        <div className="flex items-center gap-2">
+                      <div className="mt-2 flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
+                        <div className="flex items-center gap-1 sm:gap-2">
                           <span className="font-medium">Grade:</span>
-                          <span className="px-2 py-1 bg-gray-100 rounded">{selectedStudent.grade}</span>
+                          <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gray-100 rounded text-xs sm:text-sm">{selectedStudent.grade}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">Student ID:</span>
-                          <span className="px-2 py-1 bg-gray-100 rounded">{selectedStudent.studentId}</span>
+                        <div className="flex items-center gap-1 sm:gap-2">
+                          <span className="font-medium">ID:</span>
+                          <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gray-100 rounded text-xs sm:text-sm">{selectedStudent.studentId}</span>
                         </div>
-                        <div className="flex items-center gap-3 ml-auto">
-                          <span className="text-xs">Grade Range: 50-100</span>
-                          <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">70-100 = Blue</span>
-                          <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold">50-69 = Red</span>
+                        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto sm:ml-auto mt-2 sm:mt-0">
+                          <span className="text-[10px] sm:text-xs">Range: 50-100</span>
+                          <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-blue-100 text-blue-700 rounded text-[10px] sm:text-xs font-semibold">70-100 = Blue</span>
+                          <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-red-100 text-red-700 rounded text-[10px] sm:text-xs font-semibold">50-69 = Red</span>
                         </div>
                       </div>
                     </div>
@@ -934,9 +934,9 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                         setShowAddGrade(false);
                         setActiveSubjectIndex(0);
                       }}
-                      className="ml-4 text-gray-500 hover:text-gray-700 flex-shrink-0"
+                      className="ml-2 sm:ml-4 text-gray-500 hover:text-gray-700 flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center"
                     >
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
@@ -944,79 +944,79 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                 </div>
 
                 {/* Period Averages Display */}
-                <div className="px-6 py-3 bg-gradient-to-r from-blue-50 to-purple-50 border-b border-gray-200 flex-shrink-0">
-                  <p className="text-xs font-medium text-gray-600 mb-2">Period Averages & Rankings (Across All Subjects)</p>
-                  <div className="grid grid-cols-4 gap-3">
+                <div className="px-3 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-50 to-purple-50 border-b border-gray-200 flex-shrink-0">
+                  <p className="text-[10px] sm:text-xs font-medium text-gray-600 mb-1 sm:mb-2">Period Averages (Across All Subjects)</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">
                     {/* Semester 1 Periods */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-blue-700">1st Period:</span>
-                      <span className="text-sm font-bold text-blue-900">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <span className="text-[10px] sm:text-xs font-medium text-blue-700">1st:</span>
+                      <span className="text-xs sm:text-sm font-bold text-blue-900">
                         {calculatePeriodAverage('period1') || '-'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-blue-700">2nd Period:</span>
-                      <span className="text-sm font-bold text-blue-900">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <span className="text-[10px] sm:text-xs font-medium text-blue-700">2nd:</span>
+                      <span className="text-xs sm:text-sm font-bold text-blue-900">
                         {calculatePeriodAverage('period2') || '-'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-blue-700">3rd Period:</span>
-                      <span className="text-sm font-bold text-blue-900">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <span className="text-[10px] sm:text-xs font-medium text-blue-700">3rd:</span>
+                      <span className="text-xs sm:text-sm font-bold text-blue-900">
                         {calculatePeriodAverage('period3') || '-'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-blue-700">Exam 1:</span>
-                      <span className="text-sm font-bold text-blue-900">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <span className="text-[10px] sm:text-xs font-medium text-blue-700">Exam 1:</span>
+                      <span className="text-xs sm:text-sm font-bold text-blue-900">
                         {calculatePeriodAverage('exam1') || '-'}
                       </span>
                     </div>
                   </div>
-                  <div className="grid grid-cols-4 gap-3 mt-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3 mt-1 sm:mt-2">
                     {/* Semester 2 Periods */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-purple-700">4th Period:</span>
-                      <span className="text-sm font-bold text-purple-900">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <span className="text-[10px] sm:text-xs font-medium text-purple-700">4th:</span>
+                      <span className="text-xs sm:text-sm font-bold text-purple-900">
                         {calculatePeriodAverage('period4') || '-'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-purple-700">5th Period:</span>
-                      <span className="text-sm font-bold text-purple-900">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <span className="text-[10px] sm:text-xs font-medium text-purple-700">5th:</span>
+                      <span className="text-xs sm:text-sm font-bold text-purple-900">
                         {calculatePeriodAverage('period5') || '-'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-purple-700">6th Period:</span>
-                      <span className="text-sm font-bold text-purple-900">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <span className="text-[10px] sm:text-xs font-medium text-purple-700">6th:</span>
+                      <span className="text-xs sm:text-sm font-bold text-purple-900">
                         {calculatePeriodAverage('period6') || '-'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-purple-700">Exam 2:</span>
-                      <span className="text-sm font-bold text-purple-900">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <span className="text-[10px] sm:text-xs font-medium text-purple-700">Exam 2:</span>
+                      <span className="text-xs sm:text-sm font-bold text-purple-900">
                         {calculatePeriodAverage('exam2') || '-'}
                       </span>
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-4 mt-3 pt-3 border-t border-gray-300">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-gray-300">
                     {/* Semester and Final Averages */}
-                    <div className="flex items-center gap-2 bg-blue-100 px-3 py-2 rounded-lg">
-                      <span className="text-xs font-medium text-blue-800">Semester 1 Average:</span>
-                      <span className={`text-base font-bold ${getGradeColorClass(calculateSemester1Average() ?? undefined) || 'text-blue-900'}`}>
+                    <div className="flex items-center justify-between sm:justify-start gap-2 bg-blue-100 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg">
+                      <span className="text-[10px] sm:text-xs font-medium text-blue-800">Sem 1 Avg:</span>
+                      <span className={`text-sm sm:text-base font-bold ${getGradeColorClass(calculateSemester1Average() ?? undefined) || 'text-blue-900'}`}>
                         {calculateSemester1Average() || '-'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 bg-purple-100 px-3 py-2 rounded-lg">
-                      <span className="text-xs font-medium text-purple-800">Semester 2 Average:</span>
-                      <span className={`text-base font-bold ${getGradeColorClass(calculateSemester2Average() ?? undefined) || 'text-purple-900'}`}>
+                    <div className="flex items-center justify-between sm:justify-start gap-2 bg-purple-100 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg">
+                      <span className="text-[10px] sm:text-xs font-medium text-purple-800">Sem 2 Avg:</span>
+                      <span className={`text-sm sm:text-base font-bold ${getGradeColorClass(calculateSemester2Average() ?? undefined) || 'text-purple-900'}`}>
                         {calculateSemester2Average() || '-'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 bg-green-100 px-3 py-2 rounded-lg">
-                      <span className="text-xs font-medium text-green-800">Final Average:</span>
-                      <span className={`text-base font-bold ${getGradeColorClass(calculateFinalAverageAcrossSubjects() ?? undefined) || 'text-green-900'}`}>
+                    <div className="flex items-center justify-between sm:justify-start gap-2 bg-green-100 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg">
+                      <span className="text-[10px] sm:text-xs font-medium text-green-800">Final Avg:</span>
+                      <span className={`text-sm sm:text-base font-bold ${getGradeColorClass(calculateFinalAverageAcrossSubjects() ?? undefined) || 'text-green-900'}`}>
                         {calculateFinalAverageAcrossSubjects() || '-'}
                       </span>
                     </div>
@@ -1024,31 +1024,33 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                 </div>
 
                 {/* Grade Entry Table */}
-                <div className="flex-1 overflow-auto px-6 py-6">
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse min-w-[1200px]">
+                <div className="flex-1 overflow-auto px-2 sm:px-6 py-3 sm:py-6">
+                  <div className="overflow-x-auto -mx-2 sm:mx-0">
+                    <div className="inline-block min-w-full align-middle">
+                      <div className="overflow-hidden">
+                    <table className="w-full border-collapse min-w-[800px] sm:min-w-[1000px]">
                     <thead>
                       <tr className="bg-gray-100">
-                        <th className="border border-gray-300 px-4 py-3 text-left font-semibold text-gray-700 sticky left-0 bg-gray-100 z-10 min-w-[180px]">Subject</th>
-                        <th className="border border-gray-300 px-3 py-3 text-center font-semibold text-blue-700" colSpan={4}>Semester 1</th>
-                        <th className="border border-gray-300 px-3 py-3 text-center font-semibold text-blue-700">Sem1 Avg</th>
-                        <th className="border border-gray-300 px-3 py-3 text-center font-semibold text-purple-700" colSpan={4}>Semester 2</th>
-                        <th className="border border-gray-300 px-3 py-3 text-center font-semibold text-purple-700">Sem2 Avg</th>
-                        <th className="border border-gray-300 px-3 py-3 text-center font-semibold text-green-700">Final</th>
+                        <th className="border border-gray-300 px-2 sm:px-4 py-2 sm:py-3 text-left font-semibold text-gray-700 sticky left-0 bg-gray-100 z-10 min-w-[120px] sm:min-w-[180px] text-xs sm:text-sm">Subject</th>
+                        <th className="border border-gray-300 px-2 sm:px-3 py-2 sm:py-3 text-center font-semibold text-blue-700 text-xs sm:text-sm" colSpan={4}>Semester 1</th>
+                        <th className="border border-gray-300 px-2 sm:px-3 py-2 sm:py-3 text-center font-semibold text-blue-700 text-xs sm:text-sm">Sem1 Avg</th>
+                        <th className="border border-gray-300 px-2 sm:px-3 py-2 sm:py-3 text-center font-semibold text-purple-700 text-xs sm:text-sm" colSpan={4}>Semester 2</th>
+                        <th className="border border-gray-300 px-2 sm:px-3 py-2 sm:py-3 text-center font-semibold text-purple-700 text-xs sm:text-sm">Sem2 Avg</th>
+                        <th className="border border-gray-300 px-2 sm:px-3 py-2 sm:py-3 text-center font-semibold text-green-700 text-xs sm:text-sm">Final</th>
                       </tr>
                       <tr className="bg-gray-50">
-                        <th className="border border-gray-300 px-4 py-2 text-left font-medium text-gray-600 text-sm sticky left-0 bg-gray-50 z-10"></th>
-                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm">1st</th>
-                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm">2nd</th>
-                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm">3rd</th>
-                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm">Exam</th>
-                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm"></th>
-                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm">4th</th>
-                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm">5th</th>
-                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm">6th</th>
-                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm">Exam</th>
-                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm"></th>
-                        <th className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600 text-sm"></th>
+                        <th className="border border-gray-300 px-2 sm:px-4 py-1.5 sm:py-2 text-left font-medium text-gray-600 text-xs sticky left-0 bg-gray-50 z-10"></th>
+                        <th className="border border-gray-300 px-1.5 sm:px-3 py-1.5 sm:py-2 text-center font-medium text-gray-600 text-xs">1st</th>
+                        <th className="border border-gray-300 px-1.5 sm:px-3 py-1.5 sm:py-2 text-center font-medium text-gray-600 text-xs">2nd</th>
+                        <th className="border border-gray-300 px-1.5 sm:px-3 py-1.5 sm:py-2 text-center font-medium text-gray-600 text-xs">3rd</th>
+                        <th className="border border-gray-300 px-1.5 sm:px-3 py-1.5 sm:py-2 text-center font-medium text-gray-600 text-xs">Exam</th>
+                        <th className="border border-gray-300 px-1.5 sm:px-3 py-1.5 sm:py-2 text-center font-medium text-gray-600 text-xs"></th>
+                        <th className="border border-gray-300 px-1.5 sm:px-3 py-1.5 sm:py-2 text-center font-medium text-gray-600 text-xs">4th</th>
+                        <th className="border border-gray-300 px-1.5 sm:px-3 py-1.5 sm:py-2 text-center font-medium text-gray-600 text-xs">5th</th>
+                        <th className="border border-gray-300 px-1.5 sm:px-3 py-1.5 sm:py-2 text-center font-medium text-gray-600 text-xs">6th</th>
+                        <th className="border border-gray-300 px-1.5 sm:px-3 py-1.5 sm:py-2 text-center font-medium text-gray-600 text-xs">Exam</th>
+                        <th className="border border-gray-300 px-1.5 sm:px-3 py-1.5 sm:py-2 text-center font-medium text-gray-600 text-xs"></th>
+                        <th className="border border-gray-300 px-1.5 sm:px-3 py-1.5 sm:py-2 text-center font-medium text-gray-600 text-xs"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1060,8 +1062,8 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
 
                         return (
                           <tr key={subject} className="hover:bg-gray-50">
-                            <td className="border border-gray-300 px-4 py-2 font-medium text-gray-900 sticky left-0 bg-white">{subject}</td>
-                            <td className="border border-gray-300 px-2 py-2">
+                            <td className="border border-gray-300 px-2 sm:px-4 py-1.5 sm:py-2 font-medium text-gray-900 sticky left-0 bg-white text-xs sm:text-sm">{subject}</td>
+                            <td className="border border-gray-300 px-1 sm:px-2 py-1.5 sm:py-2">
                               <input
                                 type="number"
                                 step="0.01"
@@ -1070,11 +1072,11 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                                 value={data.period1 || ''}
                                 onChange={(e) => updateSubjectGrade(subject, 'period1', e.target.value)}
                                 onBlur={(e) => validateGradeOnBlur(subject, 'period1', e.target.value)}
-                                className={`w-full px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-sm ${getGradeColorClass(data.period1)}`}
+                                className={`w-full min-w-[50px] sm:min-w-[60px] px-1 sm:px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-xs sm:text-sm ${getGradeColorClass(data.period1)}`}
                                 placeholder="-"
                               />
                             </td>
-                            <td className="border border-gray-300 px-2 py-2">
+                            <td className="border border-gray-300 px-1 sm:px-2 py-1.5 sm:py-2">
                               <input
                                 type="number"
                                 step="0.01"
@@ -1083,11 +1085,11 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                                 value={data.period2 || ''}
                                 onChange={(e) => updateSubjectGrade(subject, 'period2', e.target.value)}
                                 onBlur={(e) => validateGradeOnBlur(subject, 'period2', e.target.value)}
-                                className={`w-full px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-sm ${getGradeColorClass(data.period2)}`}
+                                className={`w-full min-w-[50px] sm:min-w-[60px] px-1 sm:px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-xs sm:text-sm ${getGradeColorClass(data.period2)}`}
                                 placeholder="-"
                               />
                             </td>
-                            <td className="border border-gray-300 px-2 py-2">
+                            <td className="border border-gray-300 px-1 sm:px-2 py-1.5 sm:py-2">
                               <input
                                 type="number"
                                 step="0.01"
@@ -1096,11 +1098,11 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                                 value={data.period3 || ''}
                                 onChange={(e) => updateSubjectGrade(subject, 'period3', e.target.value)}
                                 onBlur={(e) => validateGradeOnBlur(subject, 'period3', e.target.value)}
-                                className={`w-full px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-sm ${getGradeColorClass(data.period3)}`}
+                                className={`w-full min-w-[50px] sm:min-w-[60px] px-1 sm:px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-xs sm:text-sm ${getGradeColorClass(data.period3)}`}
                                 placeholder="-"
                               />
                             </td>
-                            <td className="border border-gray-300 px-2 py-2">
+                            <td className="border border-gray-300 px-1 sm:px-2 py-1.5 sm:py-2">
                               <input
                                 type="number"
                                 step="0.01"
@@ -1109,16 +1111,16 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                                 value={data.exam1 || ''}
                                 onChange={(e) => updateSubjectGrade(subject, 'exam1', e.target.value)}
                                 onBlur={(e) => validateGradeOnBlur(subject, 'exam1', e.target.value)}
-                                className={`w-full px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-sm ${getGradeColorClass(data.exam1)}`}
+                                className={`w-full min-w-[50px] sm:min-w-[60px] px-1 sm:px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-xs sm:text-sm ${getGradeColorClass(data.exam1)}`}
                                 placeholder="-"
                               />
                             </td>
-                            <td className="border border-gray-300 px-3 py-2 text-center bg-blue-50">
-                              <span className={getGradeColorClass(sem1Avg) || 'font-semibold text-gray-600'}>
+                            <td className="border border-gray-300 px-2 sm:px-3 py-1.5 sm:py-2 text-center bg-blue-50">
+                              <span className={`text-xs sm:text-sm ${getGradeColorClass(sem1Avg) || 'font-semibold text-gray-600'}`}>
                                 {sem1Avg || '-'}
                               </span>
                             </td>
-                            <td className="border border-gray-300 px-2 py-2">
+                            <td className="border border-gray-300 px-1 sm:px-2 py-1.5 sm:py-2">
                               <input
                                 type="number"
                                 step="0.01"
@@ -1127,11 +1129,11 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                                 value={data.period4 || ''}
                                 onChange={(e) => updateSubjectGrade(subject, 'period4', e.target.value)}
                                 onBlur={(e) => validateGradeOnBlur(subject, 'period4', e.target.value)}
-                                className={`w-full px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-sm ${getGradeColorClass(data.period4)}`}
+                                className={`w-full min-w-[50px] sm:min-w-[60px] px-1 sm:px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-xs sm:text-sm ${getGradeColorClass(data.period4)}`}
                                 placeholder="-"
                               />
                             </td>
-                            <td className="border border-gray-300 px-2 py-2">
+                            <td className="border border-gray-300 px-1 sm:px-2 py-1.5 sm:py-2">
                               <input
                                 type="number"
                                 step="0.01"
@@ -1140,11 +1142,11 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                                 value={data.period5 || ''}
                                 onChange={(e) => updateSubjectGrade(subject, 'period5', e.target.value)}
                                 onBlur={(e) => validateGradeOnBlur(subject, 'period5', e.target.value)}
-                                className={`w-full px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-sm ${getGradeColorClass(data.period5)}`}
+                                className={`w-full min-w-[50px] sm:min-w-[60px] px-1 sm:px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-xs sm:text-sm ${getGradeColorClass(data.period5)}`}
                                 placeholder="-"
                               />
                             </td>
-                            <td className="border border-gray-300 px-2 py-2">
+                            <td className="border border-gray-300 px-1 sm:px-2 py-1.5 sm:py-2">
                               <input
                                 type="number"
                                 step="0.01"
@@ -1153,11 +1155,11 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                                 value={data.period6 || ''}
                                 onChange={(e) => updateSubjectGrade(subject, 'period6', e.target.value)}
                                 onBlur={(e) => validateGradeOnBlur(subject, 'period6', e.target.value)}
-                                className={`w-full px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-sm ${getGradeColorClass(data.period6)}`}
+                                className={`w-full min-w-[50px] sm:min-w-[60px] px-1 sm:px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-xs sm:text-sm ${getGradeColorClass(data.period6)}`}
                                 placeholder="-"
                               />
                             </td>
-                            <td className="border border-gray-300 px-2 py-2">
+                            <td className="border border-gray-300 px-1 sm:px-2 py-1.5 sm:py-2">
                               <input
                                 type="number"
                                 step="0.01"
@@ -1166,17 +1168,17 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                                 value={data.exam2 || ''}
                                 onChange={(e) => updateSubjectGrade(subject, 'exam2', e.target.value)}
                                 onBlur={(e) => validateGradeOnBlur(subject, 'exam2', e.target.value)}
-                                className={`w-full px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-sm ${getGradeColorClass(data.exam2)}`}
+                                className={`w-full min-w-[50px] sm:min-w-[60px] px-1 sm:px-2 py-1 text-center border border-gray-200 rounded focus:ring-2 focus:ring-green-500 outline-none text-xs sm:text-sm ${getGradeColorClass(data.exam2)}`}
                                 placeholder="-"
                               />
                             </td>
-                            <td className="border border-gray-300 px-3 py-2 text-center bg-purple-50">
-                              <span className={getGradeColorClass(sem2Avg) || 'font-semibold text-gray-600'}>
+                            <td className="border border-gray-300 px-2 sm:px-3 py-1.5 sm:py-2 text-center bg-purple-50">
+                              <span className={`text-xs sm:text-sm ${getGradeColorClass(sem2Avg) || 'font-semibold text-gray-600'}`}>
                                 {sem2Avg || '-'}
                               </span>
                             </td>
-                            <td className="border border-gray-300 px-3 py-2 text-center bg-green-50">
-                              <span className={getGradeColorClass(finalAvg) || 'font-bold text-gray-600'}>
+                            <td className="border border-gray-300 px-2 sm:px-3 py-1.5 sm:py-2 text-center bg-green-50">
+                              <span className={`text-xs sm:text-sm ${getGradeColorClass(finalAvg) || 'font-bold text-gray-600'}`}>
                                 {finalAvg || '-'}
                               </span>
                             </td>
@@ -1185,25 +1187,26 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                       })}
                     </tbody>
                   </table>
+                      </div>
+                    </div>
                   </div>
 
                   {/* General Comments Section */}
-                  <div className="mt-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">General Comments (Optional)</label>
+                  <div className="mt-4 sm:mt-6">
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">General Comments (Optional)</label>
                     <textarea
                       value={subjectGrades[subjects[0]]?.comments || ''}
                       onChange={(e) => updateSubjectGrade(subjects[0], 'comments', e.target.value)}
                       rows={3}
-                      className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                      className="w-full px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
                       placeholder="Add any general notes or comments..."
                     />
                   </div>
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
-
-                  <div className="flex gap-3 justify-between">
+                <div className="px-3 sm:px-6 py-3 sm:py-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                     <button
                       type="button"
                       onClick={() => {
@@ -1211,7 +1214,7 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                         setSelectedStudent(null);
                       }}
                       disabled={isSaving}
-                      className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400"
+                      className="w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400 min-h-[48px] text-sm sm:text-base"
                     >
                       Cancel
                     </button>
@@ -1220,7 +1223,7 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                       type="button"
                       onClick={handleSaveAllGrades}
                       disabled={isSaving}
-                      className="px-8 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition flex items-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      className="w-full sm:flex-1 px-4 sm:px-8 py-2.5 sm:py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition flex items-center justify-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed min-h-[48px] text-sm sm:text-base"
                     >
                       {isSaving ? (
                         <>
@@ -1228,14 +1231,14 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
-                          Saving...
+                          <span>Saving...</span>
                         </>
                       ) : (
                         <>
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
-                          {editMode ? 'Update All Grades' : 'Save All Grades'}
+                          <span>{editMode ? 'Update All Grades' : 'Save All Grades'}</span>
                         </>
                       )}
                     </button>
