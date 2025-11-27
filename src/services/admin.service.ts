@@ -292,7 +292,7 @@ export const adminService = {
 
   // Subscribe to maintenance mode changes
   subscribeToMaintenanceMode(callback: (payload: any) => void) {
-    return supabase
+    const channel = supabase
       .channel('maintenance_mode_changes')
       .on(
         'postgres_changes',
@@ -303,6 +303,17 @@ export const adminService = {
         },
         callback
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[Maintenance Mode Subscription] Status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('[Maintenance Mode Subscription] Successfully subscribed to maintenance_mode changes');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[Maintenance Mode Subscription] Channel error - realtime might not be enabled');
+        } else if (status === 'TIMED_OUT') {
+          console.error('[Maintenance Mode Subscription] Subscription timed out');
+        }
+      });
+
+    return channel;
   },
 };

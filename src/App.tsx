@@ -67,9 +67,14 @@ function App() {
     // Only students need to be monitored for maintenance mode
     if (currentUser.role !== 'student') return;
 
+    console.log('[Maintenance Mode] Setting up realtime subscription for student:', currentUser.email);
+
     const maintenanceSubscription = adminService.subscribeToMaintenanceMode(async (payload) => {
+      console.log('[Maintenance Mode] Received realtime event:', payload);
+
       if (payload.new && payload.new.is_enabled) {
         // Maintenance mode was just enabled - log out the student
+        console.log('[Maintenance Mode] Logging out student due to maintenance mode activation');
         const message = payload.new.message || 'Grades input is in progress. Please try again later.';
         await authService.signOut();
         setCurrentUser(null);
@@ -77,7 +82,11 @@ function App() {
       }
     });
 
+    // Log subscription status
+    console.log('[Maintenance Mode] Subscription created:', maintenanceSubscription);
+
     return () => {
+      console.log('[Maintenance Mode] Cleaning up subscription');
       maintenanceSubscription.unsubscribe();
     };
   }, [currentUser]);
