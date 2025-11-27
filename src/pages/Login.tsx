@@ -34,8 +34,8 @@ export default function Login({ onLogin, maintenanceMessage }: LoginProps) {
     }
 
     // Check if account is locked
-    if (securityService.isLockedOut(sanitizedEmail)) {
-      const minutes = securityService.getLockoutTimeRemaining(sanitizedEmail);
+    if (await securityService.isLockedOut(sanitizedEmail)) {
+      const minutes = await securityService.getLockoutTimeRemaining(sanitizedEmail);
       setSecurityError(
         `Account temporarily locked due to multiple failed login attempts. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`
       );
@@ -43,7 +43,7 @@ export default function Login({ onLogin, maintenanceMessage }: LoginProps) {
     }
 
     // Check remaining attempts
-    const remainingAttempts = securityService.getRemainingAttempts(sanitizedEmail);
+    const remainingAttempts = await securityService.getRemainingAttempts(sanitizedEmail);
     if (remainingAttempts <= 2 && remainingAttempts > 0) {
       console.warn(`[Security] ${remainingAttempts} login attempts remaining`);
     }
@@ -53,22 +53,22 @@ export default function Login({ onLogin, maintenanceMessage }: LoginProps) {
     try {
       await onLogin({ email: sanitizedEmail, password: sanitizedPassword });
       // Success - record successful login
-      securityService.recordLoginAttempt(sanitizedEmail, true);
+      await securityService.recordLoginAttempt(sanitizedEmail, true);
     } catch (error) {
       // Failure - record failed attempt
-      securityService.recordLoginAttempt(sanitizedEmail, false);
+      await securityService.recordLoginAttempt(sanitizedEmail, false);
 
       // Apply progressive delay
       await securityService.applyProgressiveDelay(sanitizedEmail);
 
       // Check if now locked out
-      if (securityService.isLockedOut(sanitizedEmail)) {
-        const minutes = securityService.getLockoutTimeRemaining(sanitizedEmail);
+      if (await securityService.isLockedOut(sanitizedEmail)) {
+        const minutes = await securityService.getLockoutTimeRemaining(sanitizedEmail);
         setSecurityError(
           `Account locked due to too many failed attempts. Please try again in ${minutes} minutes.`
         );
       } else {
-        const remaining = securityService.getRemainingAttempts(sanitizedEmail);
+        const remaining = await securityService.getRemainingAttempts(sanitizedEmail);
         if (remaining > 0) {
           setSecurityError(
             `Invalid credentials. ${remaining} attempt${remaining > 1 ? 's' : ''} remaining before account lockout.`

@@ -1,24 +1,35 @@
 /**
- * Security Service
- * Provides client-side security measures including rate limiting,
- * input validation, and attack detection
+ * Security Service - Remote Storage Implementation
+ * Provides server-side security measures including rate limiting,
+ * input validation, and attack detection using Supabase
  */
+
+import { supabase } from '../lib/supabase';
 
 interface LoginAttempt {
   email: string;
   timestamp: number;
   success: boolean;
+  ip_address?: string;
+  user_agent?: string;
 }
 
 interface RateLimitEntry {
-  count: number;
-  firstAttempt: number;
-  lastAttempt: number;
-  lockedUntil?: number;
+  email: string;
+  attempt_count: number;
+  first_attempt_at: string;
+  last_attempt_at: string;
+  locked_until?: string;
+}
+
+interface SecurityEvent {
+  email: string;
+  event_type: string;
+  details?: Record<string, any>;
+  ip_address?: string;
 }
 
 class SecurityService {
-  private readonly STORAGE_KEY = 'security_login_attempts';
   private readonly MAX_ATTEMPTS = 5;
   private readonly WINDOW_MS = 15 * 60 * 1000; // 15 minutes
   private readonly LOCKOUT_DURATION_MS = 30 * 60 * 1000; // 30 minutes
@@ -27,139 +38,240 @@ class SecurityService {
   /**
    * Check if user is currently locked out
    */
-  isLockedOut(identifier: string): boolean {
-    const rateLimits = this.getRateLimits();
-    const entry = rateLimits[identifier];
+  async isLockedOut(identifier: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('rate_limits')
+        .select('locked_until')
+        .eq('email', identifier.toLowerCase())
+        .single();
 
-    if (!entry || !entry.lockedUntil) return false;
+      if (error || !data || !data.locked_until) return false;
 
-    if (Date.now() < entry.lockedUntil) {
-      return true;
+      const lockedUntil = new Date(data.locked_until).getTime();
+      const now = Date.now();
+
+      if (now < lockedUntil) {
+        return true;
+      }
+
+      // Lockout expired, clear it
+      await supabase
+        .from('rate_limits')
+        .update({ locked_until: null, attempt_count: 0 })
+        .eq('email', identifier.toLowerCase());
+
+      return false;
+    } catch (error) {
+      console.error('[Security] Error checking lockout status:', error);
+      return false;
     }
-
-    // Lockout expired, clear it
-    delete entry.lockedUntil;
-    this.saveRateLimits(rateLimits);
-    return false;
   }
 
   /**
    * Get remaining lockout time in minutes
    */
-  getLockoutTimeRemaining(identifier: string): number {
-    const rateLimits = this.getRateLimits();
-    const entry = rateLimits[identifier];
+  async getLockoutTimeRemaining(identifier: string): Promise<number> {
+    try {
+      const { data, error } = await supabase
+        .from('rate_limits')
+        .select('locked_until')
+        .eq('email', identifier.toLowerCase())
+        .single();
 
-    if (!entry || !entry.lockedUntil) return 0;
+      if (error || !data || !data.locked_until) return 0;
 
-    const remaining = entry.lockedUntil - Date.now();
-    return Math.ceil(remaining / 60000); // Convert to minutes
+      const remaining = new Date(data.locked_until).getTime() - Date.now();
+      return Math.ceil(remaining / 60000); // Convert to minutes
+    } catch (error) {
+      console.error('[Security] Error getting lockout time:', error);
+      return 0;
+    }
   }
 
   /**
    * Record a login attempt
    */
-  recordLoginAttempt(identifier: string, success: boolean): void {
-    const rateLimits = this.getRateLimits();
-    const now = Date.now();
+  async recordLoginAttempt(identifier: string, success: boolean): Promise<void> {
+    try {
+      const email = identifier.toLowerCase();
+      const now = new Date().toISOString();
 
-    if (!rateLimits[identifier]) {
-      rateLimits[identifier] = {
-        count: 0,
-        firstAttempt: now,
-        lastAttempt: now,
-      };
-    }
+      // Insert login attempt record
+      await supabase.from('login_attempts').insert({
+        email,
+        success,
+        timestamp: now,
+        ip_address: await this.getClientIP(),
+        user_agent: navigator.userAgent,
+      });
 
-    const entry = rateLimits[identifier];
-
-    // Reset counter if window has passed
-    if (now - entry.firstAttempt > this.WINDOW_MS) {
-      entry.count = 0;
-      entry.firstAttempt = now;
-    }
-
-    if (success) {
-      // Clear attempts on successful login
-      delete rateLimits[identifier];
-    } else {
-      // Increment failed attempts
-      entry.count++;
-      entry.lastAttempt = now;
-
-      // Lock account if max attempts reached
-      if (entry.count >= this.MAX_ATTEMPTS) {
-        entry.lockedUntil = now + this.LOCKOUT_DURATION_MS;
-        console.warn(`[Security] Account locked due to ${this.MAX_ATTEMPTS} failed login attempts`);
+      if (success) {
+        // Clear rate limit on successful login
+        await supabase
+          .from('rate_limits')
+          .delete()
+          .eq('email', email);
+      } else {
+        // Handle failed attempt
+        await this.handleFailedAttempt(email, now);
       }
+    } catch (error) {
+      console.error('[Security] Error recording login attempt:', error);
     }
+  }
 
-    this.saveRateLimits(rateLimits);
+  /**
+   * Handle failed login attempt - update rate limits
+   */
+  private async handleFailedAttempt(email: string, timestamp: string): Promise<void> {
+    try {
+      // Get current rate limit entry
+      const { data: existing } = await supabase
+        .from('rate_limits')
+        .select('*')
+        .eq('email', email)
+        .single();
 
-    // Store attempt history
-    this.addLoginAttemptHistory({
-      email: identifier,
-      timestamp: now,
-      success,
-    });
+      if (!existing) {
+        // Create new rate limit entry
+        await supabase.from('rate_limits').insert({
+          email,
+          attempt_count: 1,
+          first_attempt_at: timestamp,
+          last_attempt_at: timestamp,
+        });
+      } else {
+        // Check if window has expired (15 minutes)
+        const firstAttemptTime = new Date(existing.first_attempt_at).getTime();
+        const now = new Date(timestamp).getTime();
+
+        let newCount = existing.attempt_count + 1;
+        let firstAttempt = existing.first_attempt_at;
+
+        // Reset window if expired
+        if (now - firstAttemptTime > this.WINDOW_MS) {
+          newCount = 1;
+          firstAttempt = timestamp;
+        }
+
+        // Check if should lock account
+        let lockedUntil = existing.locked_until;
+        if (newCount >= this.MAX_ATTEMPTS) {
+          lockedUntil = new Date(now + this.LOCKOUT_DURATION_MS).toISOString();
+
+          // Log security event
+          await this.logSecurityEvent({
+            email,
+            event_type: 'ACCOUNT_LOCKED',
+            details: {
+              reason: 'Too many failed login attempts',
+              attempt_count: newCount,
+            },
+          });
+
+          console.warn(`[Security] Account ${email} locked due to ${this.MAX_ATTEMPTS} failed login attempts`);
+        }
+
+        // Update rate limit entry
+        await supabase
+          .from('rate_limits')
+          .update({
+            attempt_count: newCount,
+            first_attempt_at: firstAttempt,
+            last_attempt_at: timestamp,
+            locked_until: lockedUntil,
+          })
+          .eq('email', email);
+      }
+    } catch (error) {
+      console.error('[Security] Error handling failed attempt:', error);
+    }
   }
 
   /**
    * Check if rate limit is exceeded (before lockout)
    */
-  isRateLimited(identifier: string): boolean {
-    if (this.isLockedOut(identifier)) return true;
+  async isRateLimited(identifier: string): Promise<boolean> {
+    if (await this.isLockedOut(identifier)) return true;
 
-    const rateLimits = this.getRateLimits();
-    const entry = rateLimits[identifier];
+    try {
+      const { data } = await supabase
+        .from('rate_limits')
+        .select('*')
+        .eq('email', identifier.toLowerCase())
+        .single();
 
-    if (!entry) return false;
+      if (!data) return false;
 
-    const now = Date.now();
+      const now = Date.now();
+      const firstAttemptTime = new Date(data.first_attempt_at).getTime();
 
-    // Reset if window expired
-    if (now - entry.firstAttempt > this.WINDOW_MS) {
-      delete rateLimits[identifier];
-      this.saveRateLimits(rateLimits);
+      // Reset if window expired
+      if (now - firstAttemptTime > this.WINDOW_MS) {
+        await supabase
+          .from('rate_limits')
+          .delete()
+          .eq('email', identifier.toLowerCase());
+        return false;
+      }
+
+      return data.attempt_count >= this.MAX_ATTEMPTS;
+    } catch (error) {
+      console.error('[Security] Error checking rate limit:', error);
       return false;
     }
-
-    return entry.count >= this.MAX_ATTEMPTS;
   }
 
   /**
    * Get number of remaining attempts
    */
-  getRemainingAttempts(identifier: string): number {
-    const rateLimits = this.getRateLimits();
-    const entry = rateLimits[identifier];
+  async getRemainingAttempts(identifier: string): Promise<number> {
+    try {
+      const { data } = await supabase
+        .from('rate_limits')
+        .select('*')
+        .eq('email', identifier.toLowerCase())
+        .single();
 
-    if (!entry) return this.MAX_ATTEMPTS;
+      if (!data) return this.MAX_ATTEMPTS;
 
-    const now = Date.now();
+      const now = Date.now();
+      const firstAttemptTime = new Date(data.first_attempt_at).getTime();
 
-    // Reset if window expired
-    if (now - entry.firstAttempt > this.WINDOW_MS) {
+      // Reset if window expired
+      if (now - firstAttemptTime > this.WINDOW_MS) {
+        return this.MAX_ATTEMPTS;
+      }
+
+      return Math.max(0, this.MAX_ATTEMPTS - data.attempt_count);
+    } catch (error) {
+      console.error('[Security] Error getting remaining attempts:', error);
       return this.MAX_ATTEMPTS;
     }
-
-    return Math.max(0, this.MAX_ATTEMPTS - entry.count);
   }
 
   /**
    * Apply progressive delay after failed login
    */
   async applyProgressiveDelay(identifier: string): Promise<void> {
-    const rateLimits = this.getRateLimits();
-    const entry = rateLimits[identifier];
+    try {
+      const { data } = await supabase
+        .from('rate_limits')
+        .select('attempt_count')
+        .eq('email', identifier.toLowerCase())
+        .single();
 
-    if (!entry || entry.count === 0) return;
+      if (!data || data.attempt_count === 0) return;
 
-    // Progressive delay: increases with each failed attempt
-    const delay = Math.min(entry.count * this.PROGRESSIVE_DELAY_MS, 10000);
+      // Progressive delay: increases with each failed attempt
+      const delay = Math.min(data.attempt_count * this.PROGRESSIVE_DELAY_MS, 10000);
 
-    console.log(`[Security] Applying ${delay}ms delay after failed attempt`);
-    await new Promise(resolve => setTimeout(resolve, delay));
+      console.log(`[Security] Applying ${delay}ms delay after failed attempt`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    } catch (error) {
+      console.error('[Security] Error applying progressive delay:', error);
+    }
   }
 
   /**
@@ -216,96 +328,186 @@ class SecurityService {
   /**
    * Detect suspicious patterns in login attempts
    */
-  detectSuspiciousActivity(identifier: string): boolean {
-    const history = this.getLoginAttemptHistory();
-    const recentAttempts = history.filter(
-      attempt =>
-        attempt.email === identifier &&
-        Date.now() - attempt.timestamp < 5 * 60 * 1000 // Last 5 minutes
-    );
+  async detectSuspiciousActivity(identifier: string): Promise<boolean> {
+    try {
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
 
-    // Flag if more than 10 attempts in 5 minutes
-    if (recentAttempts.length > 10) {
-      console.warn('[Security] Suspicious activity detected: Too many login attempts');
-      return true;
+      const { data, error } = await supabase
+        .from('login_attempts')
+        .select('*')
+        .eq('email', identifier.toLowerCase())
+        .gte('timestamp', fiveMinutesAgo);
+
+      if (error || !data) return false;
+
+      // Flag if more than 10 attempts in 5 minutes
+      if (data.length > 10) {
+        await this.logSecurityEvent({
+          email: identifier.toLowerCase(),
+          event_type: 'SUSPICIOUS_ACTIVITY',
+          details: {
+            reason: 'Too many login attempts in short time',
+            attempt_count: data.length,
+            time_window: '5 minutes',
+          },
+        });
+
+        console.warn('[Security] Suspicious activity detected: Too many login attempts');
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('[Security] Error detecting suspicious activity:', error);
+      return false;
     }
-
-    return false;
   }
 
   /**
-   * Clear all security data (for testing or admin purposes)
+   * Log a security event
    */
-  clearSecurityData(): void {
-    localStorage.removeItem(this.STORAGE_KEY);
-    localStorage.removeItem(`${this.STORAGE_KEY}_history`);
+  async logSecurityEvent(event: SecurityEvent): Promise<void> {
+    try {
+      await supabase.from('security_events').insert({
+        email: event.email.toLowerCase(),
+        event_type: event.event_type,
+        details: event.details || {},
+        ip_address: await this.getClientIP(),
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('[Security] Error logging security event:', error);
+    }
+  }
+
+  /**
+   * Clear all security data for an email (for testing or admin purposes)
+   */
+  async clearSecurityData(email: string): Promise<void> {
+    try {
+      const normalizedEmail = email.toLowerCase();
+
+      await Promise.all([
+        supabase.from('rate_limits').delete().eq('email', normalizedEmail),
+        supabase.from('login_attempts').delete().eq('email', normalizedEmail),
+      ]);
+
+      console.log(`[Security] Cleared security data for ${email}`);
+    } catch (error) {
+      console.error('[Security] Error clearing security data:', error);
+    }
   }
 
   /**
    * Get security report for identifier
    */
-  getSecurityReport(identifier: string): {
+  async getSecurityReport(identifier: string): Promise<{
     isLocked: boolean;
     remainingAttempts: number;
     lockoutMinutes: number;
     recentAttempts: number;
-  } {
-    const history = this.getLoginAttemptHistory();
-    const recentAttempts = history.filter(
-      attempt =>
-        attempt.email === identifier &&
-        Date.now() - attempt.timestamp < 15 * 60 * 1000
-    ).length;
-
-    return {
-      isLocked: this.isLockedOut(identifier),
-      remainingAttempts: this.getRemainingAttempts(identifier),
-      lockoutMinutes: this.getLockoutTimeRemaining(identifier),
-      recentAttempts,
-    };
-  }
-
-  // Private helper methods
-
-  private getRateLimits(): Record<string, RateLimitEntry> {
+  }> {
     try {
-      const stored = localStorage.getItem(this.STORAGE_KEY);
-      return stored ? JSON.parse(stored) : {};
-    } catch {
-      return {};
-    }
-  }
+      const email = identifier.toLowerCase();
+      const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 
-  private saveRateLimits(rateLimits: Record<string, RateLimitEntry>): void {
-    try {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(rateLimits));
+      const { data: attempts } = await supabase
+        .from('login_attempts')
+        .select('*')
+        .eq('email', email)
+        .gte('timestamp', fifteenMinutesAgo);
+
+      return {
+        isLocked: await this.isLockedOut(email),
+        remainingAttempts: await this.getRemainingAttempts(email),
+        lockoutMinutes: await this.getLockoutTimeRemaining(email),
+        recentAttempts: attempts?.length || 0,
+      };
     } catch (error) {
-      console.error('[Security] Failed to save rate limits:', error);
+      console.error('[Security] Error getting security report:', error);
+      return {
+        isLocked: false,
+        remainingAttempts: this.MAX_ATTEMPTS,
+        lockoutMinutes: 0,
+        recentAttempts: 0,
+      };
     }
   }
 
-  private getLoginAttemptHistory(): LoginAttempt[] {
+  /**
+   * Get client IP address (best effort)
+   */
+  private async getClientIP(): Promise<string | undefined> {
     try {
-      const stored = localStorage.getItem(`${this.STORAGE_KEY}_history`);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
+      // This is a best-effort approach - in production you might use a service
+      // or rely on server-side logging for accurate IP tracking
+      return 'client-side'; // Placeholder - actual IP should be logged server-side
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  /**
+   * Admin function: Get recent security events
+   */
+  async getRecentSecurityEvents(limit: number = 50): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('security_events')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('[Security] Error fetching security events:', error);
       return [];
     }
   }
 
-  private addLoginAttemptHistory(attempt: LoginAttempt): void {
+  /**
+   * Admin function: Get locked accounts
+   */
+  async getLockedAccounts(): Promise<RateLimitEntry[]> {
     try {
-      const history = this.getLoginAttemptHistory();
+      const now = new Date().toISOString();
 
-      // Keep only last 100 attempts
-      history.push(attempt);
-      if (history.length > 100) {
-        history.shift();
-      }
+      const { data, error } = await supabase
+        .from('rate_limits')
+        .select('*')
+        .not('locked_until', 'is', null)
+        .gte('locked_until', now);
 
-      localStorage.setItem(`${this.STORAGE_KEY}_history`, JSON.stringify(history));
+      if (error) throw error;
+      return data || [];
     } catch (error) {
-      console.error('[Security] Failed to save login attempt history:', error);
+      console.error('[Security] Error fetching locked accounts:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Admin function: Unlock an account
+   */
+  async unlockAccount(email: string): Promise<boolean> {
+    try {
+      await supabase
+        .from('rate_limits')
+        .update({ locked_until: null, attempt_count: 0 })
+        .eq('email', email.toLowerCase());
+
+      await this.logSecurityEvent({
+        email: email.toLowerCase(),
+        event_type: 'ACCOUNT_UNLOCKED',
+        details: { unlocked_by: 'admin' },
+      });
+
+      console.log(`[Security] Account ${email} unlocked by admin`);
+      return true;
+    } catch (error) {
+      console.error('[Security] Error unlocking account:', error);
+      return false;
     }
   }
 }

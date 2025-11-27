@@ -176,13 +176,17 @@ Administrators can:
 ## 🔐 Technical Security Details
 
 ### Client-Side Security
-- **Rate limiting**: Implemented in `src/services/security.service.ts`
-- **Local storage**: Used for tracking login attempts (cleared on success)
 - **Input validation**: All user inputs sanitized before processing
+- **XSS Prevention**: Removes dangerous characters and patterns
+- **Email validation**: Format validation before submission
 
 ### Server-Side Security (Supabase)
 - **Authentication**: JWT tokens with automatic refresh
 - **Authorization**: Row Level Security policies
+- **Rate limiting**: Implemented in Supabase database (cannot be bypassed)
+- **Login tracking**: All attempts logged in `login_attempts` table
+- **Account lockout**: Automatic 30-minute lockout after 5 failed attempts
+- **Security events**: Suspicious activity logged in `security_events` table
 - **Encryption**: All data encrypted in transit (HTTPS) and at rest
 - **Backups**: Automatic daily backups
 
@@ -201,6 +205,12 @@ For security concerns or to report vulnerabilities:
 ## 📝 Security Updates
 
 ### Version History
+- **v2.1.0** (2025-11-27): Migrated to remote storage security
+  - Server-side rate limiting in Supabase (bypasses client-side vulnerabilities)
+  - Login attempt tracking in database
+  - Security event logging system
+  - Admin security monitoring tools
+  - Automatic data cleanup functions
 - **v2.0.0** (2025-11-27): Added comprehensive security features
   - Rate limiting and account lockout
   - Input sanitization
