@@ -52,6 +52,39 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [gradeNotifications, setGradeNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [lastActivity, setLastActivity] = useState<number>(Date.now());
+
+  // Session timeout effect - auto logout after 20 minutes of inactivity
+  useEffect(() => {
+    const TIMEOUT_DURATION = 20 * 60 * 1000; // 20 minutes in milliseconds
+
+    const resetTimer = () => {
+      setLastActivity(Date.now());
+    };
+
+    // Track user activity
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach(event => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    // Check for inactivity every minute
+    const checkInterval = setInterval(() => {
+      const timeSinceActivity = Date.now() - lastActivity;
+      if (timeSinceActivity >= TIMEOUT_DURATION) {
+        console.log('[Session Timeout] Logging out student due to 20 minutes of inactivity');
+        onLogout();
+      }
+    }, 60000); // Check every minute
+
+    // Cleanup
+    return () => {
+      events.forEach(event => {
+        window.removeEventListener(event, resetTimer);
+      });
+      clearInterval(checkInterval);
+    };
+  }, [lastActivity, onLogout]);
 
   useEffect(() => {
     loadGrades();
