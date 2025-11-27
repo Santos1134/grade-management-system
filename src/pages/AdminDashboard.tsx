@@ -474,6 +474,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
         studentId: student.id,
         studentName: student.name,
         grade: student.grade,
+        section: student.section,
         average: average,
         hasGrades: values.length > 0
       };
@@ -566,6 +567,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
           studentId: student.id,
           studentName: student.name,
           grade: student.grade,
+          section: student.section,
           average: average,
           hasGrades: values.length > 0
         };
@@ -659,6 +661,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                   <tr>
                     <th>Rank</th>
                     <th>Student Name</th>
+                    <th>Class</th>
                     <th>Average</th>
                     <th>Honor Level</th>
                   </tr>
@@ -681,6 +684,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                       <tr class="${rowClass}">
                         <td>${index + 1}</td>
                         <td>${student.studentName}</td>
+                        <td>${student.grade}${student.section ? ' - Section ' + student.section : ''}</td>
                         <td>${student.average.toFixed(2)}%</td>
                         <td><strong>${honorLevel}</strong></td>
                       </tr>
@@ -1459,7 +1463,9 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                                 <div className="text-sm font-medium text-gray-900">{student.studentName}</div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-600">{student.grade}</div>
+                                <div className="text-sm text-gray-600">
+                                  {student.grade}{student.section ? ` - Section ${student.section}` : ''}
+                                </div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm font-bold text-green-600">{student.average.toFixed(2)}%</div>
