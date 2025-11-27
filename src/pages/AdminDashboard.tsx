@@ -426,9 +426,9 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     } else if (selectedGradeForRanking.includes(' - ')) {
       // Handle section-specific filtering (e.g., "7th Grade - A")
       const [grade, section] = selectedGradeForRanking.split(' - ');
-      filteredStudents = students.filter(s => s.grade === grade && s.section === section);
+      filteredStudents = students.filter(s => s.students && s.students.grade === grade && s.students.section === section);
     } else {
-      filteredStudents = students.filter(s => s.grade === selectedGradeForRanking);
+      filteredStudents = students.filter(s => s.students && s.students.grade === selectedGradeForRanking);
     }
 
     // Calculate average for selected period for each student
@@ -473,8 +473,8 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
       return {
         studentId: student.id,
         studentName: student.name,
-        grade: student.grade,
-        section: student.section,
+        grade: student.students?.grade || '',
+        section: student.students?.section || '',
         average: average,
         hasGrades: values.length > 0
       };
@@ -523,7 +523,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     const honorStudentsByClass: Record<string, any[]> = {};
 
     gradeClasses.forEach(gradeClass => {
-      const classStudents = students.filter(s => s.grade === gradeClass);
+      const classStudents = students.filter(s => s.students && s.students.grade === gradeClass);
 
       const studentAverages = classStudents.map(student => {
         const studentGrades = allGrades.filter((g: any) => g.studentId === student.id);
@@ -566,8 +566,8 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
         return {
           studentId: student.id,
           studentName: student.name,
-          grade: student.grade,
-          section: student.section,
+          grade: student.students?.grade || '',
+          section: student.students?.section || '',
           average: average,
           hasGrades: values.length > 0
         };
