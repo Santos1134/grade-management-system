@@ -33,16 +33,6 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
       return;
     }
 
-    // Check if account is locked
-    if (await securityService.isLockedOut(sanitizedEmail)) {
-      const minutes = await securityService.getLockoutTimeRemaining(sanitizedEmail);
-      setNotification({
-        message: `Account temporarily locked. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`,
-        type: 'error'
-      });
-      return;
-    }
-
     setIsLoading(true);
 
     try {
@@ -50,23 +40,7 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
       await securityService.recordLoginAttempt(sanitizedEmail, true);
     } catch (error) {
       await securityService.recordLoginAttempt(sanitizedEmail, false);
-      await securityService.applyProgressiveDelay(sanitizedEmail);
-
-      if (await securityService.isLockedOut(sanitizedEmail)) {
-        const minutes = await securityService.getLockoutTimeRemaining(sanitizedEmail);
-        setNotification({
-          message: `Account locked due to multiple failed attempts. Try again in ${minutes} minutes.`,
-          type: 'error'
-        });
-      } else {
-        const remaining = await securityService.getRemainingAttempts(sanitizedEmail);
-        if (remaining > 0) {
-          setNotification({
-            message: `Invalid credentials. ${remaining} attempt${remaining > 1 ? 's' : ''} remaining.`,
-            type: 'error'
-          });
-        }
-      }
+      // Error message will be handled by parent component
     } finally {
       setIsLoading(false);
     }

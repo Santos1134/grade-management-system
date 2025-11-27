@@ -33,21 +33,6 @@ export default function Login({ onLogin, maintenanceMessage }: LoginProps) {
       return;
     }
 
-    // Check if account is locked
-    if (await securityService.isLockedOut(sanitizedEmail)) {
-      const minutes = await securityService.getLockoutTimeRemaining(sanitizedEmail);
-      setSecurityError(
-        `Account temporarily locked due to multiple failed login attempts. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`
-      );
-      return;
-    }
-
-    // Check remaining attempts
-    const remainingAttempts = await securityService.getRemainingAttempts(sanitizedEmail);
-    if (remainingAttempts <= 2 && remainingAttempts > 0) {
-      console.warn(`[Security] ${remainingAttempts} login attempts remaining`);
-    }
-
     setIsLoading(true);
 
     try {
@@ -57,24 +42,7 @@ export default function Login({ onLogin, maintenanceMessage }: LoginProps) {
     } catch (error) {
       // Failure - record failed attempt
       await securityService.recordLoginAttempt(sanitizedEmail, false);
-
-      // Apply progressive delay
-      await securityService.applyProgressiveDelay(sanitizedEmail);
-
-      // Check if now locked out
-      if (await securityService.isLockedOut(sanitizedEmail)) {
-        const minutes = await securityService.getLockoutTimeRemaining(sanitizedEmail);
-        setSecurityError(
-          `Account locked due to too many failed attempts. Please try again in ${minutes} minutes.`
-        );
-      } else {
-        const remaining = await securityService.getRemainingAttempts(sanitizedEmail);
-        if (remaining > 0) {
-          setSecurityError(
-            `Invalid credentials. ${remaining} attempt${remaining > 1 ? 's' : ''} remaining before account lockout.`
-          );
-        }
-      }
+      // Error message will be handled by parent component
     } finally {
       setIsLoading(false);
     }
