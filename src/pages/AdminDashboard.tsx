@@ -419,6 +419,13 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
         finalAverage: g.final_average,
       }));
 
+    // DEBUG: Log first student to see data structure
+    if (students.length > 0) {
+      console.log('[DEBUG Rankings] First student object:', students[0]);
+      console.log('[DEBUG Rankings] Student.students:', students[0].students);
+      console.log('[DEBUG Rankings] Is students an array?', Array.isArray(students[0].students));
+    }
+
     // Filter by selected grade if not 'all'
     let filteredStudents: any[];
     if (selectedGradeForRanking === 'all') {
@@ -470,7 +477,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
         ? values.reduce((sum: number, val: number) => sum + val, 0) / values.length
         : 0;
 
-      return {
+      const rankingData = {
         studentId: student.id,
         studentName: student.name,
         grade: student.students?.grade || '',
@@ -478,6 +485,13 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
         average: average,
         hasGrades: values.length > 0
       };
+
+      // DEBUG: Log ranking data for first student
+      if (student.id === students[0]?.id) {
+        console.log('[DEBUG Rankings] First ranking data:', rankingData);
+      }
+
+      return rankingData;
     });
 
     // Filter students with grades and sort by average
