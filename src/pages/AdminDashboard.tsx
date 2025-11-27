@@ -26,7 +26,7 @@ interface NewUserForm {
 }
 
 export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
-  const [showCreateUser, setShowCreateUser] = useState(true);
+  const [showCreateUser, setShowCreateUser] = useState(false);
   const [userType, setUserType] = useState<'student' | 'sponsor' | null>('student');
   const [formData, setFormData] = useState<NewUserForm>({
     password: '',
@@ -46,7 +46,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
   const [selectedPeriod, setSelectedPeriod] = useState<'period1' | 'period2' | 'period3' | 'exam1' | 'period4' | 'period5' | 'period6' | 'exam2' | 'sem1Avg' | 'sem2Avg' | 'finalAvg'>('period1');
   const [selectedGradeForRanking, setSelectedGradeForRanking] = useState<string>('all');
   const [rankingView, setRankingView] = useState<'all' | 'honor'>('all');
-  const [showAllUsers, setShowAllUsers] = useState(true);
+  const [showAllUsers, setShowAllUsers] = useState(false);
   const [userViewType, setUserViewType] = useState<'students' | 'sponsors'>('students');
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -59,6 +59,38 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
   const [resetPasswordModal, setResetPasswordModal] = useState<{ userId: string; userName: string; userRole: string } | null>(null);
   const [resetPasswordResult, setResetPasswordResult] = useState<{ email: string; password: string; name: string; role: string } | null>(null);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+
+  // Close all sections
+  const closeAllSections = () => {
+    setShowCreateUser(false);
+    setShowPeriodRankings(false);
+    setShowAllUsers(false);
+    setShowChangePassword(false);
+    setShowAuditTrail(false);
+  };
+
+  // Toggle section with accordion behavior
+  const toggleSection = (section: 'createUser' | 'periodRankings' | 'allUsers' | 'changePassword' | 'auditTrail') => {
+    closeAllSections();
+
+    switch (section) {
+      case 'createUser':
+        setShowCreateUser(true);
+        break;
+      case 'periodRankings':
+        setShowPeriodRankings(true);
+        break;
+      case 'allUsers':
+        setShowAllUsers(true);
+        break;
+      case 'changePassword':
+        setShowChangePassword(true);
+        break;
+      case 'auditTrail':
+        setShowAuditTrail(true);
+        break;
+    }
+  };
 
   // Load users from Supabase
   const loadUsers = async () => {
@@ -714,7 +746,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
               <nav className="p-3 sm:p-4 space-y-2 grid grid-cols-2 lg:grid-cols-1 gap-2">
                 <button
                   onClick={() => {
-                    setShowCreateUser(true);
+                    toggleSection('createUser');
                     setUserType('student');
                   }}
                   className="w-full flex flex-col lg:flex-row items-center gap-2 lg:gap-3 px-3 sm:px-4 py-3 text-center lg:text-left text-gray-700 hover:bg-blue-50 rounded-lg transition group min-h-[48px]"
@@ -729,7 +761,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
                 <button
                   onClick={() => {
-                    setShowCreateUser(true);
+                    toggleSection('createUser');
                     setUserType('sponsor');
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-green-50 rounded-lg transition group"
@@ -743,7 +775,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 </button>
 
                 <button
-                  onClick={() => setShowPeriodRankings(!showPeriodRankings)}
+                  onClick={() => toggleSection('periodRankings')}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-purple-50 rounded-lg transition group"
                 >
                   <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition">
@@ -756,7 +788,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
                 <button
                   onClick={() => {
-                    setShowPeriodRankings(true);
+                    toggleSection('periodRankings');
                     setRankingView('honor');
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-yellow-50 rounded-lg transition group"
@@ -772,7 +804,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 <button
                   onClick={() => {
                     setUserViewType('students');
-                    setShowAllUsers(true);
+                    toggleSection('allUsers');
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-indigo-50 rounded-lg transition group"
                 >
@@ -787,7 +819,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 <button
                   onClick={() => {
                     setUserViewType('sponsors');
-                    setShowAllUsers(true);
+                    toggleSection('allUsers');
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-teal-50 rounded-lg transition group"
                 >
@@ -850,7 +882,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 </button>
 
                 <button
-                  onClick={() => setShowChangePassword(true)}
+                  onClick={() => toggleSection('changePassword')}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-orange-50 rounded-lg transition group"
                 >
                   <div className="p-2 bg-orange-100 rounded-lg group-hover:bg-orange-200 transition">
@@ -863,7 +895,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
                 <button
                   onClick={() => {
-                    setShowAuditTrail(true);
+                    toggleSection('auditTrail');
                     loadAuditLogs();
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-red-50 rounded-lg transition group"
