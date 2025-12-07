@@ -4,6 +4,75 @@ import { adminService } from '../services/admin.service';
 import { auditService } from '../services/audit.service';
 import { gradeService } from '../services/grade.service';
 
+interface Student {
+  grade: string;
+  student_id: string;
+  section?: string;
+}
+
+interface Sponsor {
+  grade: string;
+  section?: string;
+}
+
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: 'student' | 'sponsor' | 'admin';
+  students?: Student;
+  sponsors?: Sponsor;
+}
+
+interface Grade {
+  studentId: string;
+  subject: string;
+  period1?: number;
+  period2?: number;
+  period3?: number;
+  exam1?: number;
+  sem1Av?: number;
+  period4?: number;
+  period5?: number;
+  period6?: number;
+  exam2?: number;
+  sem2Av?: number;
+  finalAverage?: number;
+}
+
+interface StudentRanking {
+  studentId: string;
+  studentName: string;
+  grade: string;
+  section: string;
+  average: number;
+  hasGrades: boolean;
+  class?: string;
+}
+
+interface AuditLog {
+  timestamp: string;
+  user_name: string;
+  user?: string;
+  action: string;
+  details: Record<string, unknown> & {
+    studentName?: string;
+    studentGrade?: string;
+    studentSection?: string;
+    subjectCount?: number;
+    subjects?: string[];
+    gradeChanges?: Array<{
+      subject: string;
+      changes: Record<string, { old: unknown; new: unknown }>;
+    }>;
+    newUserName?: string;
+    newUserRole?: string;
+    newUserEmail?: string;
+    deletedUserName?: string;
+    targetUserName?: string;
+  };
+}
+
 interface Admin {
   id: string;
   email: string;
@@ -36,7 +105,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     grade: '',
     section: '',
   });
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
@@ -51,8 +120,8 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [showAuditTrail, setShowAuditTrail] = useState(false);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
-  const [periodRankings, setPeriodRankings] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [periodRankings, setPeriodRankings] = useState<StudentRanking[]>([]);
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState<{ is_enabled: boolean; message: string }>({ is_enabled: false, message: 'Grades input is in progress. Please try again later.' });
   const [isTogglingMaintenance, setIsTogglingMaintenance] = useState(false);
@@ -116,18 +185,20 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     loadUsers();
     loadAuditLogs();
     loadMaintenanceMode();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
+    const loadPeriodRankings = async () => {
+      const rankings = await calculatePeriodRankings();
+      setPeriodRankings(rankings);
+    };
+
     if (showPeriodRankings && users.length > 0) {
       loadPeriodRankings();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showPeriodRankings, selectedPeriod, selectedGradeForRanking, rankingView, users]);
-
-  const loadPeriodRankings = async () => {
-    const rankings = await calculatePeriodRankings();
-    setPeriodRankings(rankings);
-  };
 
   const loadAuditLogs = async () => {
     try {
@@ -227,9 +298,10 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
       // Auto-open the user list to show the newly created user
       setUserViewType(userType === 'student' ? 'students' : 'sponsors');
       setShowAllUsers(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating user:', error);
-      showNotification(error.message || 'Failed to create user', 'error');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create user';
+      showNotification(errorMessage, 'error');
     } finally {
       setIsCreatingUser(false);
     }
@@ -266,9 +338,10 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
       showNotification(`Password reset successful for ${resetPasswordModal.userName}`, 'success');
       await loadUsers(); // Reload users list
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error resetting password:', error);
-      showNotification(error.message || 'Failed to reset password', 'error');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to reset password';
+      showNotification(errorMessage, 'error');
       setResetPasswordModal(null);
     } finally {
       setIsResettingPassword(false);
@@ -303,9 +376,10 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
       showNotification('User deleted successfully!', 'success');
       setDeleteConfirm(null);
       await loadUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting user:', error);
-      showNotification(error.message || 'Failed to delete user', 'error');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete user';
+      showNotification(errorMessage, 'error');
     }
   };
 
@@ -344,9 +418,10 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
       setShowChangePassword(false);
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       await loadAuditLogs();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error changing password:', error);
-      showNotification(error.message || 'Failed to change password', 'error');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to change password';
+      showNotification(errorMessage, 'error');
     }
   };
 
@@ -383,15 +458,15 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     return Array.from(grades).sort();
   };
 
-  const calculateSemesterAverage = (p1: any, p2: any, p3: any, exam: any) => {
-    const values = [p1, p2, p3, exam].filter(v => v !== undefined && !isNaN(v));
+  const calculateSemesterAverage = (p1: number | undefined, p2: number | undefined, p3: number | undefined, exam: number | undefined): number | null => {
+    const values = [p1, p2, p3, exam].filter((v): v is number => v !== undefined && !isNaN(v));
     if (values.length !== 4) return null;
-    return values.reduce((sum, val) => sum + parseFloat(val), 0) / values.length;
+    return values.reduce((sum, val) => sum + val, 0) / values.length;
   };
 
-  const calculateFinalAverage = (sem1: any, sem2: any) => {
+  const calculateFinalAverage = (sem1: number | null, sem2: number | null): number | null => {
     if (!sem1 || !sem2) return null;
-    return (parseFloat(sem1) + parseFloat(sem2)) / 2;
+    return (sem1 + sem2) / 2;
   };
 
   const calculatePeriodRankings = async () => {
@@ -403,20 +478,20 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
       const gradesData = await gradeService.getGradesForStudents(studentIds);
 
       // Convert to the format expected by the rest of the function
-      const allGrades = gradesData.map((g: any) => ({
-        studentId: g.student_id,
-        subject: g.subject,
-        period1: g.period1,
-        period2: g.period2,
-        period3: g.period3,
-        exam1: g.exam1,
-        sem1Av: g.sem1_av,
-        period4: g.period4,
-        period5: g.period5,
-        period6: g.period6,
-        exam2: g.exam2,
-        sem2Av: g.sem2_av,
-        finalAverage: g.final_average,
+      const allGrades: Grade[] = gradesData.map((g: Record<string, unknown>) => ({
+        studentId: g.student_id as string,
+        subject: g.subject as string,
+        period1: g.period1 as number | undefined,
+        period2: g.period2 as number | undefined,
+        period3: g.period3 as number | undefined,
+        exam1: g.exam1 as number | undefined,
+        sem1Av: g.sem1_av as number | undefined,
+        period4: g.period4 as number | undefined,
+        period5: g.period5 as number | undefined,
+        period6: g.period6 as number | undefined,
+        exam2: g.exam2 as number | undefined,
+        sem2Av: g.sem2_av as number | undefined,
+        finalAverage: g.final_average as number | undefined,
       }));
 
     // DEBUG: Log first student to see data structure
@@ -427,7 +502,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     }
 
     // Filter by selected grade if not 'all'
-    let filteredStudents: any[];
+    let filteredStudents: User[];
     if (selectedGradeForRanking === 'all') {
       filteredStudents = students;
     } else if (selectedGradeForRanking.includes(' - ')) {
@@ -440,37 +515,36 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
     // Calculate average for selected period for each student
     const studentAverages = filteredStudents.map(student => {
-      const studentGrades = allGrades.filter((g: any) => g.studentId === student.id);
+      const studentGrades = allGrades.filter((g: Grade) => g.studentId === student.id);
 
       let average = 0;
       let values: number[] = [];
 
       if (selectedPeriod === 'sem1Avg') {
         // Calculate Semester 1 Average
-        studentGrades.forEach((g: any) => {
+        studentGrades.forEach((g: Grade) => {
           const sem1Avg = calculateSemesterAverage(g.period1, g.period2, g.period3, g.exam1);
-          if (sem1Avg) values.push(sem1Avg);
+          if (sem1Avg !== null) values.push(sem1Avg);
         });
       } else if (selectedPeriod === 'sem2Avg') {
         // Calculate Semester 2 Average
-        studentGrades.forEach((g: any) => {
+        studentGrades.forEach((g: Grade) => {
           const sem2Avg = calculateSemesterAverage(g.period4, g.period5, g.period6, g.exam2);
-          if (sem2Avg) values.push(sem2Avg);
+          if (sem2Avg !== null) values.push(sem2Avg);
         });
       } else if (selectedPeriod === 'finalAvg') {
         // Calculate Final Average
-        studentGrades.forEach((g: any) => {
+        studentGrades.forEach((g: Grade) => {
           const sem1Avg = calculateSemesterAverage(g.period1, g.period2, g.period3, g.exam1);
           const sem2Avg = calculateSemesterAverage(g.period4, g.period5, g.period6, g.exam2);
           const finalAvg = calculateFinalAverage(sem1Avg, sem2Avg);
-          if (finalAvg) values.push(finalAvg);
+          if (finalAvg !== null) values.push(finalAvg);
         });
       } else {
         // Calculate for specific period
         values = studentGrades
-          .map((g: any) => g[selectedPeriod])
-          .filter((val: any) => val !== undefined && !isNaN(val))
-          .map((val: any) => parseFloat(val));
+          .map((g: Grade) => g[selectedPeriod as keyof Grade])
+          .filter((val): val is number => typeof val === 'number' && !isNaN(val));
       }
 
       average = values.length > 0
@@ -520,57 +594,56 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
       const gradesData = await gradeService.getGradesForStudents(studentIds);
 
       // Convert to the format expected by the rest of the function
-      const allGrades = gradesData.map((g: any) => ({
-        studentId: g.student_id,
-        subject: g.subject,
-        period1: g.period1,
-        period2: g.period2,
-        period3: g.period3,
-        exam1: g.exam1,
-        period4: g.period4,
-        period5: g.period5,
-        period6: g.period6,
-        exam2: g.exam2,
+      const allGrades: Grade[] = gradesData.map((g: Record<string, unknown>) => ({
+        studentId: g.student_id as string,
+        subject: g.subject as string,
+        period1: g.period1 as number | undefined,
+        period2: g.period2 as number | undefined,
+        period3: g.period3 as number | undefined,
+        exam1: g.exam1 as number | undefined,
+        period4: g.period4 as number | undefined,
+        period5: g.period5 as number | undefined,
+        period6: g.period6 as number | undefined,
+        exam2: g.exam2 as number | undefined,
       }));
     const gradeClasses = ['7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 
-    const honorStudentsByClass: Record<string, any[]> = {};
+    const honorStudentsByClass: Record<string, StudentRanking[]> = {};
 
     gradeClasses.forEach(gradeClass => {
       const classStudents = students.filter(s => s.students && s.students.grade === gradeClass);
 
       const studentAverages = classStudents.map(student => {
-        const studentGrades = allGrades.filter((g: any) => g.studentId === student.id);
+        const studentGrades = allGrades.filter((g: Grade) => g.studentId === student.id);
 
         let average = 0;
         let values: number[] = [];
 
         if (selectedPeriod === 'sem1Avg') {
           // Calculate Semester 1 Average
-          studentGrades.forEach((g: any) => {
+          studentGrades.forEach((g: Grade) => {
             const sem1Avg = calculateSemesterAverage(g.period1, g.period2, g.period3, g.exam1);
-            if (sem1Avg) values.push(sem1Avg);
+            if (sem1Avg !== null) values.push(sem1Avg);
           });
         } else if (selectedPeriod === 'sem2Avg') {
           // Calculate Semester 2 Average
-          studentGrades.forEach((g: any) => {
+          studentGrades.forEach((g: Grade) => {
             const sem2Avg = calculateSemesterAverage(g.period4, g.period5, g.period6, g.exam2);
-            if (sem2Avg) values.push(sem2Avg);
+            if (sem2Avg !== null) values.push(sem2Avg);
           });
         } else if (selectedPeriod === 'finalAvg') {
           // Calculate Final Average
-          studentGrades.forEach((g: any) => {
+          studentGrades.forEach((g: Grade) => {
             const sem1Avg = calculateSemesterAverage(g.period1, g.period2, g.period3, g.exam1);
             const sem2Avg = calculateSemesterAverage(g.period4, g.period5, g.period6, g.exam2);
             const finalAvg = calculateFinalAverage(sem1Avg, sem2Avg);
-            if (finalAvg) values.push(finalAvg);
+            if (finalAvg !== null) values.push(finalAvg);
           });
         } else {
           // Calculate for specific period
           values = studentGrades
-            .map((g: any) => g[selectedPeriod])
-            .filter((val: any) => val !== undefined && !isNaN(val))
-            .map((val: any) => parseFloat(val));
+            .map((g: Grade) => g[selectedPeriod as keyof Grade])
+            .filter((val): val is number => typeof val === 'number' && !isNaN(val));
         }
 
         average = values.length > 0
@@ -591,9 +664,9 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
     });
 
     // Categorize by honor level
-    const highHonor: any[] = [];
-    const honorRoll: any[] = [];
-    const honorRollMention: any[] = [];
+    const highHonor: StudentRanking[] = [];
+    const honorRoll: StudentRanking[] = [];
+    const honorRollMention: StudentRanking[] = [];
 
     Object.entries(honorStudentsByClass).forEach(([gradeClass, students]) => {
       students.forEach(student => {
@@ -666,7 +739,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
         <h1>Honor Roll Report</h1>
         <div class="period-name">${periodNames[selectedPeriod]}</div>
 
-        ${Object.entries(honorData.byClass || {}).map(([gradeClass, students]: [string, any]) => `
+        ${Object.entries(honorData.byClass || {}).map(([gradeClass, students]: [string, StudentRanking[]]) => `
           <div class="honor-section">
             <h2>${gradeClass}</h2>
             ${students.length > 0 ? `
@@ -681,7 +754,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                   </tr>
                 </thead>
                 <tbody>
-                  ${students.map((student: any, index: number) => {
+                  ${students.map((student: StudentRanking, index: number) => {
                     let honorLevel = '';
                     let rowClass = '';
                     if (student.average >= 90) {
@@ -767,14 +840,14 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                     toggleSection('createUser');
                     setUserType('student');
                   }}
-                  className="w-full flex flex-col lg:flex-row items-center gap-2 lg:gap-3 px-3 sm:px-4 py-3 text-center lg:text-left text-gray-700 hover:bg-blue-50 rounded-lg transition group min-h-[48px]"
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-blue-50 rounded-lg transition group"
                 >
-                  <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition flex-shrink-0">
-                    <svg className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                     </svg>
                   </div>
-                  <span className="font-medium text-xs sm:text-sm lg:text-base">Create Student</span>
+                  <span className="font-medium">Create Student</span>
                 </button>
 
                 <button
@@ -1095,8 +1168,9 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                   </h3>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                    <label htmlFor="user-full-name" className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
                     <input
+                      id="user-full-name"
                       type="text"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -1113,13 +1187,15 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
                   {userType === 'student' && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Grade Level</label>
+                      <label htmlFor="student-grade" className="block text-sm font-medium text-gray-700 mb-2">Grade Level</label>
                       <select
+                        id="student-grade"
                         value={formData.grade}
                         onChange={(e) => {
                           setFormData({ ...formData, grade: e.target.value, section: '' });
                         }}
                         required
+                        aria-label="Select student grade level"
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                       >
                         <option value="">Select grade</option>
@@ -1136,11 +1212,13 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
                   {userType === 'student' && (formData.grade === '7th Grade' || formData.grade === '8th Grade') && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Section</label>
+                      <label htmlFor="student-section" className="block text-sm font-medium text-gray-700 mb-2">Section</label>
                       <select
+                        id="student-section"
                         value={formData.section}
                         onChange={(e) => setFormData({ ...formData, section: e.target.value })}
                         required
+                        aria-label="Select student section"
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                       >
                         <option value="">Select section</option>
@@ -1152,13 +1230,15 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
                   {userType === 'sponsor' && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Assigned Grade Level</label>
+                      <label htmlFor="sponsor-grade" className="block text-sm font-medium text-gray-700 mb-2">Assigned Grade Level</label>
                       <select
+                        id="sponsor-grade"
                         value={formData.grade}
                         onChange={(e) => {
                           setFormData({ ...formData, grade: e.target.value, section: '' });
                         }}
                         required
+                        aria-label="Select sponsor grade level"
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                       >
                         <option value="">Select grade to sponsor</option>
@@ -1174,11 +1254,13 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
 
                   {userType === 'sponsor' && (formData.grade === '7th Grade' || formData.grade === '8th Grade') && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Section</label>
+                      <label htmlFor="sponsor-section" className="block text-sm font-medium text-gray-700 mb-2">Section</label>
                       <select
+                        id="sponsor-section"
                         value={formData.section}
                         onChange={(e) => setFormData({ ...formData, section: e.target.value })}
                         required
+                        aria-label="Select sponsor section"
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                       >
                         <option value="">Select section</option>
@@ -1189,9 +1271,10 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                   )}
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <label htmlFor="user-password" className="block text-sm font-medium text-gray-700 mb-2">Password</label>
                     <div className="relative">
                       <input
+                        id="user-password"
                         type={showPassword ? "text" : "password"}
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -1202,9 +1285,19 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
                         className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
                       >
-                        {showPassword ? '👁️' : '👁️‍🗨️'}
+                        {showPassword ? (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                        </svg>
+                      )}
                       </button>
                     </div>
                     <p className="mt-1 text-xs text-gray-500">
@@ -1301,10 +1394,12 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
               {/* Filter Controls */}
               <div className="flex flex-wrap gap-4 mb-6">
                 <div className="flex-1 min-w-[200px]">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Period</label>
+                  <label htmlFor="select-period" className="block text-sm font-medium text-gray-700 mb-2">Select Period</label>
                   <select
+                    id="select-period"
                     value={selectedPeriod}
-                    onChange={(e) => setSelectedPeriod(e.target.value as any)}
+                    onChange={(e) => setSelectedPeriod(e.target.value as 'period1' | 'period2' | 'period3' | 'exam1' | 'period4' | 'period5' | 'period6' | 'exam2' | 'sem1Avg' | 'sem2Avg' | 'finalAvg')}
+                    aria-label="Select grading period"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   >
                     <optgroup label="Semester 1">
@@ -1328,10 +1423,12 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                 </div>
 
                 <div className="flex-1 min-w-[200px]">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Grade</label>
+                  <label htmlFor="filter-grade" className="block text-sm font-medium text-gray-700 mb-2">Filter by Grade</label>
                   <select
+                    id="filter-grade"
                     value={selectedGradeForRanking}
                     onChange={(e) => setSelectedGradeForRanking(e.target.value)}
+                    aria-label="Filter rankings by grade"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   >
                     <option value="all">All Grades</option>
@@ -1529,10 +1626,12 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
               {/* Filter Controls */}
               <div className="flex flex-wrap gap-3">
                 <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium text-gray-700">Grade:</label>
+                  <label htmlFor="user-filter-grade" className="text-sm font-medium text-gray-700">Grade:</label>
                   <select
+                    id="user-filter-grade"
                     value={filterGrade}
                     onChange={(e) => setFilterGrade(e.target.value)}
+                    aria-label="Filter users by grade"
                     className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
                   >
                     <option value="all">All Grades</option>
@@ -1807,33 +1906,39 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
             <h3 className="text-xl font-bold text-gray-900 mb-4">Change Password</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
+                <label htmlFor="current-password" className="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
                 <input
+                  id="current-password"
                   type="password"
                   value={passwordForm.currentPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                  placeholder="Enter current password"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
+                <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
                 <input
+                  id="new-password"
                   type="password"
                   value={passwordForm.newPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                  placeholder="Enter new password"
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   Must be 8+ characters with uppercase, lowercase, and number
                 </p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
+                <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
                 <input
+                  id="confirm-password"
                   type="password"
                   value={passwordForm.confirmPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                  placeholder="Confirm new password"
                 />
               </div>
             </div>
@@ -1905,15 +2010,15 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
                             {log.details.gradeChanges && log.details.gradeChanges.length > 0 && (
                               <div className="mt-3 pt-3 border-t border-red-200 bg-red-50 p-3 rounded">
                                 <p className="font-semibold text-red-800 mb-2">⚠️ Grade Modifications Detected:</p>
-                                {log.details.gradeChanges.map((change: any, idx: number) => (
+                                {log.details.gradeChanges.map((change: { subject: string; changes: Record<string, { old: unknown; new: unknown }> }, idx: number) => (
                                   <div key={idx} className="mb-3 bg-white p-2 rounded border border-red-200">
                                     <p className="font-medium text-gray-900">{change.subject}:</p>
-                                    {Object.entries(change.changes).map(([field, values]: [string, any]) => (
+                                    {Object.entries(change.changes).map(([field, values]: [string, { old: unknown; new: unknown }]) => (
                                       <div key={field} className="ml-4 text-xs">
                                         <span className="text-gray-600">{field}:</span>
-                                        <span className="text-red-600 line-through ml-1">{values.old}</span>
+                                        <span className="text-red-600 line-through ml-1">{String(values.old ?? '')}</span>
                                         <span className="mx-1">→</span>
-                                        <span className="text-green-600 font-semibold">{values.new}</span>
+                                        <span className="text-green-600 font-semibold">{String(values.new ?? '')}</span>
                                       </div>
                                     ))}
                                   </div>

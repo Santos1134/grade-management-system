@@ -99,17 +99,19 @@ export const gradeService = {
   // Get final rankings based on final_average
   async getFinalRankings(grade?: string, section?: string) {
     let query = supabase
-      .from('profiles')
+      .from('students')
       .select(`
         id,
-        name,
+        student_id,
         grade,
         section,
+        profiles!inner (
+          name
+        ),
         grades (
           final_average
         )
-      `)
-      .eq('role', 'student');
+      `);
 
     if (grade) {
       query = query.eq('grade', grade);
@@ -135,7 +137,7 @@ export const gradeService = {
 
         return {
           id: student.id,
-          name: student.name,
+          name: student.profiles?.name || 'Unknown',
           grade: student.grade,
           section: student.section,
           final_average: avgFinal

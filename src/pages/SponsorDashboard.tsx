@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Notification from '../components/Notification';
 import { userService } from '../services/user.service';
 import { gradeService } from '../services/grade.service';
@@ -49,6 +49,35 @@ interface SubjectGrade {
   comments: string;
 }
 
+interface Student {
+  id: string;
+  name: string;
+  email: string;
+  studentId: string;
+  grade: string;
+  section?: string;
+  role: 'student';
+}
+
+interface GradeData {
+  student_id: string;
+  subject: string;
+  period1?: number;
+  period2?: number;
+  period3?: number;
+  exam1?: number;
+  period4?: number;
+  period5?: number;
+  period6?: number;
+  exam2?: number;
+  comments?: string;
+}
+
+interface GradeChange {
+  subject: string;
+  changes: Record<string, { old: unknown; new: unknown }>;
+}
+
 interface SponsorDashboardProps {
   user: Sponsor;
   onLogout: () => void;
@@ -69,9 +98,9 @@ interface SponsorDashboardProps {
 // ];
 
 export default function SponsorDashboard({ user, onLogout }: SponsorDashboardProps) {
-  const [students, setStudents] = useState<any[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
-  const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showAddGrade, setShowAddGrade] = useState(false);
   const [, setIsLoading] = useState(true);
   const [subjectGrades, setSubjectGrades] = useState<Record<string, SubjectGrade>>({});
@@ -83,7 +112,7 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
   const [selectedPeriod, setSelectedPeriod] = useState<'period1' | 'period2' | 'period3' | 'exam1' | 'period4' | 'period5' | 'period6' | 'exam2' | 'sem1Avg' | 'sem2Avg'>('period1');
   const [isSaving, setIsSaving] = useState(false);
 
-  const getSubjectsForGrade = () => {
+  const getSubjectsForGrade = useCallback(() => {
     const isJunior = user.grade.includes('7th') || user.grade.includes('8th') || user.grade.includes('9th');
     const is12thGrade = user.grade.includes('12th');
 
@@ -94,7 +123,66 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
     } else {
       return ['Doctrine', 'English', 'Literature', 'Geography', 'History', 'Economics', 'Geometry', 'Algebra', 'Trigonometry', 'Chemistry', 'Physics', 'Biology', 'LAB', 'P.E/R.O.T.C'];
     }
+  }, [user.grade]);
+
+  const showNotification = (message: string, type: 'success' | 'error' | 'info') => {
+    setNotification({ message, type });
   };
+
+  const loadStudents = useCallback(async () => {
+    try {
+      const data = await userService.getStudents(user.grade, user.section);
+      const students = data.map((s: Record<string, unknown>) => ({
+        id: s.id as string,
+        name: (s.profiles as Record<string, unknown>).name as string,
+        email: (s.profiles as Record<string, unknown>).email as string,
+        studentId: s.student_id as string,
+        grade: s.grade as string,
+        section: s.section as string | undefined,
+        role: 'student' as const
+      }));
+      setStudents(students);
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error loading students:', error);
+      setIsLoading(false);
+    }
+  }, [user.grade, user.section]);
+
+  const loadGrades = useCallback(async () => {
+    try {
+      // Get student IDs from the current students state
+      const studentIds = students.map(s => s.id);
+      if (studentIds.length > 0) {
+        const data = await gradeService.getGradesForStudents(studentIds);
+        const formattedGrades = data.map((g: Record<string, unknown>) => ({
+          id: g.id as string,
+          studentId: g.student_id as string,
+          studentName: ((g.students as Record<string, unknown> | undefined)?.profiles as Record<string, unknown> | undefined)?.name as string || '',
+          subject: g.subject as string,
+          period1: g.period1 as number | undefined,
+          period2: g.period2 as number | undefined,
+          period3: g.period3 as number | undefined,
+          exam1: g.exam1 as number | undefined,
+          sem1Av: g.sem1_av as number | undefined,
+          period4: g.period4 as number | undefined,
+          period5: g.period5 as number | undefined,
+          period6: g.period6 as number | undefined,
+          exam2: g.exam2 as number | undefined,
+          sem2Av: g.sem2_av as number | undefined,
+          finalAverage: g.final_average as number | undefined,
+          comments: g.comments as string | undefined
+        }));
+        setGrades(formattedGrades);
+      } else {
+        // If no students yet, set empty grades
+        setGrades([]);
+      }
+    } catch (error) {
+      console.error('Error loading grades:', error);
+      setGrades([]);
+    }
+  }, [students]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -102,14 +190,14 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
       // loadGrades will be called after students are loaded
     };
     loadData();
-  }, [user.grade]);
+  }, [loadStudents]);
 
   useEffect(() => {
     // Load grades whenever students change
     if (students.length > 0) {
       loadGrades();
     }
-  }, [students]);
+  }, [students, loadGrades]);
 
   useEffect(() => {
     // Initialize subject grades when student is selected
@@ -156,66 +244,7 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
       setSubjectGrades(initialGrades);
       setEditMode(existingGrades.length > 0);
     }
-  }, [selectedStudent, showAddGrade, grades]);
-
-  const showNotification = (message: string, type: 'success' | 'error' | 'info') => {
-    setNotification({ message, type });
-  };
-
-  const loadStudents = async () => {
-    try {
-      const data = await userService.getStudents(user.grade, user.section);
-      const students = data.map((s: any) => ({
-        id: s.id,
-        name: s.profiles.name,
-        email: s.profiles.email,
-        studentId: s.student_id,
-        grade: s.grade,
-        section: s.section,
-        role: 'student'
-      }));
-      setStudents(students);
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Error loading students:', error);
-      setIsLoading(false);
-    }
-  };
-
-  const loadGrades = async () => {
-    try {
-      // Get student IDs from the current students state
-      const studentIds = students.map(s => s.id);
-      if (studentIds.length > 0) {
-        const data = await gradeService.getGradesForStudents(studentIds);
-        const formattedGrades = data.map((g: any) => ({
-          id: g.id,
-          studentId: g.student_id,
-          studentName: g.students?.profiles?.name || '',
-          subject: g.subject,
-          period1: g.period1,
-          period2: g.period2,
-          period3: g.period3,
-          exam1: g.exam1,
-          sem1Av: g.sem1_av,
-          period4: g.period4,
-          period5: g.period5,
-          period6: g.period6,
-          exam2: g.exam2,
-          sem2Av: g.sem2_av,
-          finalAverage: g.final_average,
-          comments: g.comments
-        }));
-        setGrades(formattedGrades);
-      } else {
-        // If no students yet, set empty grades
-        setGrades([]);
-      }
-    } catch (error) {
-      console.error('Error loading grades:', error);
-      setGrades([]);
-    }
-  };
+  }, [selectedStudent, showAddGrade, grades, getSubjectsForGrade]);
 
   const calculateSemesterAverage = (p1: string, p2: string, p3: string, exam: string) => {
     // Only calculate if ALL 4 values are present
@@ -256,29 +285,29 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
 
     // Calculate average for selected period for each student
     const studentAverages = students.map(student => {
-      const studentGrades = allGrades.filter((g: any) => g.studentId === student.id);
+      const studentGrades = allGrades.filter((g: Grade) => g.studentId === student.id);
 
       let average = 0;
       let values: number[] = [];
 
       if (selectedPeriod === 'sem1Avg') {
         // Calculate Semester 1 Average
-        studentGrades.forEach((g: any) => {
-          const sem1Avg = calculateSemesterAverage(g.period1, g.period2, g.period3, g.exam1);
+        studentGrades.forEach((g: Grade) => {
+          const sem1Avg = calculateSemesterAverage(g.period1?.toString() || '', g.period2?.toString() || '', g.period3?.toString() || '', g.exam1?.toString() || '');
           if (sem1Avg) values.push(parseFloat(sem1Avg));
         });
       } else if (selectedPeriod === 'sem2Avg') {
         // Calculate Semester 2 Average
-        studentGrades.forEach((g: any) => {
-          const sem2Avg = calculateSemesterAverage(g.period4, g.period5, g.period6, g.exam2);
+        studentGrades.forEach((g: Grade) => {
+          const sem2Avg = calculateSemesterAverage(g.period4?.toString() || '', g.period5?.toString() || '', g.period6?.toString() || '', g.exam2?.toString() || '');
           if (sem2Avg) values.push(parseFloat(sem2Avg));
         });
       } else {
         // Calculate for specific period
         values = studentGrades
-          .map((g: any) => g[selectedPeriod])
-          .filter((val: any) => val !== undefined && !isNaN(val))
-          .map((val: any) => parseFloat(val));
+          .map((g: Grade) => g[selectedPeriod])
+          .filter((val): val is number => val !== undefined && !isNaN(val))
+          .map((val: number) => parseFloat(val.toString()));
       }
 
       average = values.length > 0
@@ -352,7 +381,7 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
            subjectGrade.period6 || subjectGrade.exam2 || subjectGrade.comments;
   };
 
-  const logChange = async (action: string, details: any) => {
+  const logChange = async (action: string, details: Record<string, unknown>) => {
     try {
       await auditService.logAction({
         action,
@@ -366,8 +395,8 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
   const handleSaveAllGrades = async () => {
     if (!selectedStudent) return;
 
-    const gradesToSave: any[] = [];
-    const gradeChanges: any[] = [];
+    const gradesToSave: GradeData[] = [];
+    const gradeChanges: GradeChange[] = [];
 
     // Get existing grades for this student to track changes
     const existingGrades = grades.filter(g => g.studentId === selectedStudent.id);
@@ -393,12 +422,12 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
         const existingGrade = existingGrades.find(g => g.subject === subjectGrade.subject);
         if (existingGrade) {
           // Compare each field for changes
-          const changes: any = {};
-          const fields = ['period1', 'period2', 'period3', 'exam1', 'period4', 'period5', 'period6', 'exam2'];
+          const changes: Record<string, { old: unknown; new: unknown }> = {};
+          const fields = ['period1', 'period2', 'period3', 'exam1', 'period4', 'period5', 'period6', 'exam2'] as const;
 
           fields.forEach(field => {
-            const oldValue = (existingGrade as any)[field];
-            const newValue = (gradeData as any)[field];
+            const oldValue = existingGrade[field as keyof Grade];
+            const newValue = gradeData[field as keyof GradeData];
             if (oldValue !== newValue) {
               changes[field] = {
                 old: oldValue || 'N/A',
@@ -458,9 +487,10 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
       setShowAddGrade(false);
       setSelectedStudent(null);
       setEditMode(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving grades:', error);
-      showNotification(error.message || 'Failed to save grades', 'error');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save grades';
+      showNotification(errorMessage, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -637,8 +667,9 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                 <label className="text-sm font-medium text-gray-700">Select Period:</label>
                 <select
                   value={selectedPeriod}
-                  onChange={(e) => setSelectedPeriod(e.target.value as any)}
+                  onChange={(e) => setSelectedPeriod(e.target.value as 'period1' | 'period2' | 'period3' | 'exam1' | 'period4' | 'period5' | 'period6' | 'exam2' | 'sem1Avg' | 'sem2Avg')}
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                  aria-label="Select period for rankings"
                 >
                   <optgroup label="Semester 1">
                     <option value="period1">1st Period</option>
@@ -928,22 +959,22 @@ export default function SponsorDashboard({ user, onLogout }: SponsorDashboardPro
                           <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-red-100 text-red-700 rounded text-[10px] sm:text-xs font-semibold">50-69 = Red</span>
                         </div>
                       </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setShowAddGrade(false);
-                        setActiveSubjectIndex(0);
-                      }}
-                      className="ml-2 sm:ml-4 text-gray-500 hover:text-gray-700 flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center"
-                    >
-                      <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Period Averages Display */}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddGrade(false);
+                setActiveSubjectIndex(0);
+              }}
+              className="ml-2 sm:ml-4 text-gray-500 hover:text-gray-700 flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center"
+              aria-label="Close grade entry form"
+            >
+              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>                {/* Period Averages Display */}
                 <div className="px-3 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-50 to-purple-50 border-b border-gray-200 flex-shrink-0">
                   <p className="text-[10px] sm:text-xs font-medium text-gray-600 mb-1 sm:mb-2">Period Averages (Across All Subjects)</p>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">

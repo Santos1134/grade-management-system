@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Notification from '../components/Notification';
 import { gradeService } from '../services/grade.service';
 import { userService } from '../services/user.service';
@@ -37,6 +37,50 @@ interface Grade {
   comments?: string;
 }
 
+interface GradeNotification {
+  id: string;
+  user_id: string;
+  message: string;
+  read: boolean;
+  created_at: string;
+}
+
+interface RankingRecord {
+  id: string;
+  class_rank?: number;
+  final_rank?: number;
+  average?: number;
+}
+
+interface StudentRecord {
+  id: string;
+  student_id: string;
+  grade: string;
+  section?: string;
+  profiles: {
+    name: string;
+    email: string;
+  };
+}
+
+interface GradeRecord {
+  id: string;
+  student_id: string;
+  subject: string;
+  period1?: number;
+  period2?: number;
+  period3?: number;
+  exam1?: number;
+  sem1_av?: number;
+  period4?: number;
+  period5?: number;
+  period6?: number;
+  exam2?: number;
+  sem2_av?: number;
+  final_average?: number;
+  comments?: string;
+}
+
 interface StudentDashboardProps {
   user: Student;
   onLogout: () => void;
@@ -50,7 +94,7 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
   const [periodRankings, setPeriodRankings] = useState<{[key: string]: {position: number, total: number}}>({});
   const [sponsorName, setSponsorName] = useState<string>('Not Assigned');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [gradeNotifications, setGradeNotifications] = useState<any[]>([]);
+  const [gradeNotifications, setGradeNotifications] = useState<GradeNotification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
 
@@ -86,15 +130,6 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
     };
   }, [lastActivity, onLogout]);
 
-  useEffect(() => {
-    loadGrades();
-    calculateRanking();
-    calculateFinalRanking();
-    calculatePeriodRankings();
-    getSponsorName();
-    checkForNewGrades();
-  }, [user.id]);
-
   // Helper function to get grade color class based on value
   const getGradeColorClass = (grade: number | undefined) => {
     if (!grade) return 'text-gray-600';
@@ -103,11 +138,11 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
     return 'text-gray-600';
   };
 
-  const checkForNewGrades = async () => {
+  const checkForNewGrades = useCallback(async () => {
     try {
       // Check notifications table for unread notifications
       const notifications = await notificationService.getNotifications(user.id);
-      const unreadNotifications = notifications.filter((n: any) => !n.read);
+      const unreadNotifications = notifications.filter((n: GradeNotification) => !n.read);
 
       if (unreadNotifications.length > 0) {
         setGradeNotifications(unreadNotifications);
@@ -119,7 +154,7 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
     } catch (error) {
       console.error('Error checking for new grades:', error);
     }
-  };
+  }, [user.id]);
 
   const markNotificationsAsRead = async () => {
     try {
@@ -130,7 +165,7 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
     }
   };
 
-  const getSponsorName = async () => {
+  const getSponsorName = useCallback(async () => {
     try {
       // Get all sponsors for this grade and section
       const sponsors = await userService.getSponsors(user.grade, user.section);
@@ -143,12 +178,12 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
       console.error('Error loading sponsor:', error);
       setSponsorName('Not Assigned');
     }
-  };
+  }, [user.grade, user.section]);
 
-  const loadGrades = async () => {
+  const loadGrades = useCallback(async () => {
     try {
       const data = await gradeService.getStudentGrades(user.id);
-      const formattedGrades = data.map((g: any) => ({
+      const formattedGrades = data.map((g: GradeRecord) => ({
         id: g.id,
         studentId: g.student_id,
         studentName: user.name,
@@ -172,13 +207,13 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user.id, user.name]);
 
-  const calculateRanking = async () => {
+  const calculateRanking = useCallback(async () => {
     try {
       const rankings = await gradeService.getClassRankings(user.grade, user.section);
       const total = rankings.length;
-      const studentRanking = rankings.find((r: any) => r.id === user.id);
+      const studentRanking = rankings.find((r: RankingRecord) => r.id === user.id);
 
       if (studentRanking) {
         setRanking({
@@ -194,13 +229,13 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
     } catch (error) {
       console.error('Error calculating ranking:', error);
     }
-  };
+  }, [user.grade, user.section, user.id]);
 
-  const calculateFinalRanking = async () => {
+  const calculateFinalRanking = useCallback(async () => {
     try {
       const rankings = await gradeService.getFinalRankings(user.grade, user.section);
       const total = rankings.length;
-      const studentRanking = rankings.find((r: any) => r.id === user.id);
+      const studentRanking = rankings.find((r: RankingRecord) => r.id === user.id);
 
       if (studentRanking) {
         setFinalRanking({
@@ -216,13 +251,13 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
     } catch (error) {
       console.error('Error calculating final ranking:', error);
     }
-  };
+  }, [user.grade, user.section, user.id]);
 
-  const calculatePeriodRankings = async () => {
+  const calculatePeriodRankings = useCallback(async () => {
     try {
       // Get all students in this grade/section
       const students = await userService.getStudents(user.grade, user.section);
-      const studentIds = students.map((s: any) => s.id);
+      const studentIds = students.map((s: StudentRecord) => s.id);
 
       // Get all grades for these students
       const allGrades = await gradeService.getGradesForStudents(studentIds);
@@ -232,11 +267,11 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
 
       periods.forEach(period => {
         // Calculate period average for each student
-        const studentPeriodAverages = students.map((student: any) => {
-          const studentGrades = allGrades.filter((g: any) => g.student_id === student.id);
+        const studentPeriodAverages = students.map((student: StudentRecord) => {
+          const studentGrades = allGrades.filter((g: GradeRecord) => g.student_id === student.id);
           const values = studentGrades
-            .map((g: any) => g[period])
-            .filter((val: any) => val !== undefined && !isNaN(val) && val !== null);
+            .map((g: GradeRecord) => g[period])
+            .filter((val): val is number => val !== undefined && !isNaN(val) && val !== null);
 
           const average = values.length > 0
             ? values.reduce((sum: number, val: number) => sum + val, 0) / values.length
@@ -271,7 +306,16 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
     } catch (error) {
       console.error('Error calculating period rankings:', error);
     }
-  };
+  }, [user.grade, user.section, user.id]);
+
+  useEffect(() => {
+    loadGrades();
+    calculateRanking();
+    calculateFinalRanking();
+    calculatePeriodRankings();
+    getSponsorName();
+    checkForNewGrades();
+  }, [loadGrades, calculateRanking, calculateFinalRanking, calculatePeriodRankings, getSponsorName, checkForNewGrades]);
 
   const calculateOverallAverage = () => {
     const validAverages = grades
@@ -610,6 +654,7 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <h3 className="text-xl font-bold text-gray-900">Grade Update Notifications</h3>
               <button
+                type="button"
                 onClick={() => {
                   setShowNotifications(false);
                   // Mark notifications as read when closing the modal
@@ -618,6 +663,7 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
                   }
                 }}
                 className="text-gray-500 hover:text-gray-700"
+                aria-label="Close notifications"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -627,7 +673,7 @@ export default function StudentDashboard({ user, onLogout }: StudentDashboardPro
             <div className="flex-1 overflow-auto p-6">
               {gradeNotifications.length > 0 ? (
                 <div className="space-y-3">
-                  {gradeNotifications.map((notification: any) => (
+                  {gradeNotifications.map((notification: GradeNotification) => (
                     <div key={notification.id} className="border border-green-200 bg-green-50 rounded-lg p-4">
                       <div className="flex items-start gap-3">
                         <div className="flex-shrink-0 w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
